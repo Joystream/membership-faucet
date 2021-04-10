@@ -69,7 +69,22 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
 
   try {
     await joy.addScreenedMember(account, handle, avatar, about, (result) => {
-      if (!result.status.isInBlock) {
+      if (!result.isCompleted) {
+        return
+      }
+
+      if (result.isError) {
+        log('Failed to register:', result)
+        const { isDropped, isFinalityTimeout, isInvalid, isUsurped } = result.status
+        callback({
+          error: 'TransactionError',
+          reason: {
+            isDropped,
+            isFinalityTimeout,
+            isInvalid,
+            isUsurped,
+          },
+        }, 400)
         return
       }
 
