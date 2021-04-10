@@ -86,7 +86,7 @@ export class JoyApi {
     return nonce.eq(0) && balance.eqn(0)
   }
 
-  async addScreenedMember(account: string, handle: string, callback: Callback<ISubmittableResult>) {
+  async addScreenedMember(account: string, handle: string, avatar: string, about: string, callback: Callback<ISubmittableResult>) {
     const authAccountId = await this.api.query.members.screeningAuthority()
     const addr = this.keyring.encodeAddress(authAccountId)
     let keyPair
@@ -96,7 +96,7 @@ export class JoyApi {
       throw new Error('Screening Authority Key Not Found In Keyring')
     }
 
-    await this.api.tx.members.addScreenedMember(account, handle, null, null, ENDOWMENT).signAndSend(
+    await this.api.tx.members.addScreenedMember(account, handle, avatar, about, ENDOWMENT).signAndSend(
       keyPair,
       callback
     )
