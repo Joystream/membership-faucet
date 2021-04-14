@@ -7,7 +7,7 @@
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/app.ts",
     "build": "tsc --build tsconfig.json",
     "start-pm2": "yarn run build && pm2 start ./lib/app.js -o out.log -e err.log",
-    "start": "yarn run build && node ./lib/app.js"
+    "start": "node ./lib/app.js"
   },
   "dependencies": {
     "@joystream/types": "^0.16.0",

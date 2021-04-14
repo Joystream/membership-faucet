@@ -7,7 +7,7 @@ Membership on-boarding service for Joystream network.
 Clone the repo, then run:
 
 ```
-$ yarn
+$ yarn install
 ```
 
 to install. 
@@ -16,6 +16,7 @@ to install.
 Add your config variables to `env.example` and rename it to `.env` and then run:
 
 ```
+$ yarn build
 $ yarn start
 ```
 
