@@ -2,21 +2,25 @@
 
 Membership on-boarding service for Joystream network.
 
-## How to Install
+## Install
 
 Clone the repo, then run:
 
 ```
-$ yarn
+$ yarn install
 ```
 
-to install. Add your config variables to `env.example` and rename it to `.env` and then run:
+to install. 
+
+## Run
+Add your config variables to `env.example` and rename it to `.env` and then run:
 
 ```
+$ yarn build
 $ yarn start
 ```
 
-to start and build the server.
+Will build and start the server.
 
 ## API
 
