@@ -96,7 +96,7 @@ export class JoyApi {
       throw new Error('Screening Authority Key Not Found In Keyring')
     }
 
-    await this.api.tx.members.addScreenedMember(account, handle, avatar, about, ENDOWMENT).signAndSend(
+    return this.api.tx.members.addScreenedMember(account, handle, avatar, about, ENDOWMENT).signAndSend(
       keyPair,
       callback
     )

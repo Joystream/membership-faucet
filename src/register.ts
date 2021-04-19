@@ -18,9 +18,6 @@ function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
 export type RegisterCallback = (result: any, statusCode: number) => void
 
 export async function register(joy: JoyApi, account: string, handle: string, avatar: string, about: string, callback: RegisterCallback) {
-  let handled_tx_success = false
-  let handled_tx_failure = false
-
   await joy.init
   const { api } = joy
 
@@ -71,12 +68,13 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
   }
 
   try {
-    await joy.addScreenedMember(account, handle, avatar, about, (result) => {
+    const unsubscribe = await joy.addScreenedMember(account, handle, avatar, about, (result) => {
       if (!result.isCompleted) {
         return
       }
 
       if (result.isError) {
+        unsubscribe()
         log('Failed to register:', result)
         const { isDropped, isFinalityTimeout, isInvalid, isUsurped } = result.status
         callback({
@@ -95,14 +93,14 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
       const failed = result.findRecord('system', 'ExtrinsicFailed')
 
       if(success) {
-        if (handled_tx_success) return
+        unsubscribe()
         let memberId = memberIdFromEvent(result.events)
         log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
         callback({
           memberId,
         }, 200)
       } else {
-        if (handled_tx_failure) return
+        unsubscribe()
         let errMessage = 'UnknownError'
         const record = failed as EventRecord
         const {
