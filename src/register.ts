@@ -73,8 +73,9 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
         return
       }
 
+      unsubscribe()
+
       if (result.isError) {
-        unsubscribe()
         log('Failed to register:', result)
         const { isDropped, isFinalityTimeout, isInvalid, isUsurped } = result.status
         callback({
@@ -93,14 +94,12 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
       const failed = result.findRecord('system', 'ExtrinsicFailed')
 
       if(success) {
-        unsubscribe()
         let memberId = memberIdFromEvent(result.events)
         log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
         callback({
           memberId,
         }, 200)
       } else {
-        unsubscribe()
         let errMessage = 'UnknownError'
         const record = failed as EventRecord
         const {
