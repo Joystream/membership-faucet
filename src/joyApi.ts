@@ -8,7 +8,8 @@ import BN from "bn.js";
 // Init .env config
 config();
 
-const endowment = process.env.ENDOWMENT || ''
+const MIN_ENDOWMENT = '1'
+const endowment = process.env.ENDOWMENT || MIN_ENDOWMENT
 const ENDOWMENT = new BN(parseInt(endowment))
 
 export class JoyApi {
