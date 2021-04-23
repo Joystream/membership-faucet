@@ -1,5 +1,6 @@
 import { WsProvider, ApiPromise } from "@polkadot/api";
 import { types } from "@joystream/types";
+import { Hash } from "@joystream/types/common";
 import { Callback, ISubmittableResult } from '@polkadot/types/types'
 import { Keyring } from "@polkadot/keyring";
 import { config } from "dotenv";
@@ -84,6 +85,11 @@ export class JoyApi {
     const nonce = await this.api.rpc.system.accountNextIndex(address)
     const balance = (await this.api.derive.balances.all(address)).freeBalance
     return nonce.eq(0) && balance.eqn(0)
+  }
+
+  async blockHeightFromHash(blockHash: Hash): Promise<number> {
+    const blockHeader = await this.api.rpc.chain.getHeader(blockHash)
+    return blockHeader.number.toNumber()
   }
 
   async addScreenedMember(account: string, handle: string, avatar: string, about: string, callback: Callback<ISubmittableResult>) {
