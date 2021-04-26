@@ -94,9 +94,22 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
       if(success) {
         let memberId = memberIdFromEvent(result.events)
         log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
-        callback({
-          memberId,
-        }, 200)
+
+        const blockHash = result.status.asInBlock
+        joy.blockHeightFromHash(blockHash)
+          .then((blockNumber) => {
+            callback({
+              memberId,
+              block: blockNumber,
+            }, 200)
+          })
+          .catch((reason) => {
+            log('Failed to get extrinsic block number', reason)
+            callback({
+              memberId,
+              block: null,
+            }, 200)
+          })
       } else {
         let errMessage = 'UnknownError'
         const record = failed as EventRecord
