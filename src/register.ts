@@ -68,10 +68,12 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
   }
 
   try {
-    await joy.addScreenedMember(account, handle, avatar, about, (result) => {
+    const unsubscribe = await joy.addScreenedMember(account, handle, avatar, about, (result) => {
       if (!result.isCompleted) {
         return
       }
+
+      unsubscribe()
 
       if (result.isError) {
         log('Failed to register:', result)
