@@ -1,4 +1,4 @@
-FROM node:12 AS build
+FROM node:14 AS build
 
 WORKDIR /faucet
 
@@ -7,7 +7,7 @@ RUN yarn install --frozen-lockfile
 RUN yarn run build
 
 
-FROM node:12
+FROM node:14
 
 WORKDIR /faucet
 
