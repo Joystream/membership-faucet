@@ -1,18 +1,41 @@
 import { JoyApi } from "./joyApi";
 import { EventRecord } from '@polkadot/types/interfaces';
-import { MemberId } from '@joystream/types/members';
 import { decodeAddress } from '@polkadot/keyring'
 import { log } from './debug';
 import { DispatchError } from '@polkadot/types/interfaces/system'
 import { TypeRegistry } from '@polkadot/types'
+import BN from 'bn.js'
+import { MemberId } from '@joystream/types/common'
+import {AugmentedEvent, AugmentedEvents} from '@polkadot/api/types'
+
+// TODO: Move data from a library
+export type ExtractTuple<P> = P extends AugmentedEvent<'rxjs', infer T> ? T : never
+
+export const getDataFromEvent = <
+    Module extends keyof AugmentedEvents<'rxjs'>,
+    Event extends keyof AugmentedEvents<'rxjs'>[Module],
+    Tuple extends ExtractTuple<AugmentedEvents<'rxjs'>[Module][Event]>,
+    Index extends keyof Tuple
+    >(
+    events: EventRecord[],
+    module: Module,
+    eventName: Event,
+    index: Index = 0 as Index
+): Tuple[Index] | undefined => {
+  const eventRecord = events.find((event) => event.event.method === eventName)
+
+  if (!eventRecord) {
+    return
+  }
+
+  const data = eventRecord.event.data as unknown as Tuple
+
+  return data[index]
+}
+
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
-  const record = events.find((record) => record.event.section === "members" && record.event.method === "MemberRegistered")
-  if (record) {
-    return record.event.data[0] as MemberId
-  } else {
-    return undefined
-  }
+  return getDataFromEvent(events, 'members', 'MemberInvited', 0)
 }
 
 export type RegisterCallback = (result: any, statusCode: number) => void
@@ -40,9 +63,9 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
     return
   }
 
-  // validate handle
-  const minHandleLength = await joy.api.query.members.minHandleLength()
-  const maxHandleLength = await joy.api.query.members.maxHandleLength()
+  // validate handle @todo
+  const minHandleLength = new BN(3) // await joy.api.query.members.minHandleLength()
+  const maxHandleLength = new BN(20) // await joy.api.query.members.maxHandleLength()
 
   if(maxHandleLength.ltn(handle.length)) {
     callback({

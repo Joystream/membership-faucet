@@ -4,14 +4,12 @@ import { Hash } from "@joystream/types/common";
 import { Callback, ISubmittableResult } from '@polkadot/types/types'
 import { Keyring } from "@polkadot/keyring";
 import { config } from "dotenv";
-import BN from "bn.js";
+import {blake2AsHex} from '@polkadot/util-crypto'
 
 // Init .env config
 config();
 
-const MIN_ENDOWMENT = '1'
-const endowment = process.env.ENDOWMENT || MIN_ENDOWMENT
-const ENDOWMENT = new BN(parseInt(endowment))
+const aliceAddress = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
 
 export class JoyApi {
   endpoint: string;
@@ -78,7 +76,8 @@ export class JoyApi {
   }
 
   async handleIsAlreadyRegistered(handle: string): Promise<boolean> {
-    const storageSize = await this.api.query.members.memberIdByHandle.size(handle)
+    const handleHash = blake2AsHex(handle)
+    const storageSize = await this.api.query.members.memberIdByHandleHash.size(handleHash)
     return !storageSize.eq(0)
   }
 
@@ -94,8 +93,7 @@ export class JoyApi {
   }
 
   async addScreenedMember(account: string, handle: string, avatar: string, about: string, callback: Callback<ISubmittableResult>) {
-    const authAccountId = await this.api.query.members.screeningAuthority()
-    const addr = this.keyring.encodeAddress(authAccountId)
+    const addr = aliceAddress
     let keyPair
     try {
       keyPair = this.keyring.getPair(addr)
@@ -103,7 +101,18 @@ export class JoyApi {
       throw new Error('Screening Authority Key Not Found In Keyring')
     }
 
-    return this.api.tx.members.addScreenedMember(account, handle, avatar, about, ENDOWMENT).signAndSend(
+    const invitingMemberId = '0'
+
+    return this.api.tx.members.inviteMember({
+      inviting_member_id: invitingMemberId,
+      root_account: account,
+      controller_account: account,
+      handle: handle,
+      // TODO:
+      //  metadata: metadataToBytes(MembershipMetadata, {
+      //   about: about,
+      // }),
+    }).signAndSend(
       keyPair,
       callback
     )
