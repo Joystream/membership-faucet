@@ -48,3 +48,10 @@ On error expect a JSON response:
     "error": "ErrorType"
 }
 ```
+
+## Olympia TODO
+
+- [ ] Proper Joystream types are needed (ATM installed using https://gitpkg.now.sh)
+- [ ] Building types inside @joystream/types
+- [ ] Add proper docs
+- [ ] check polkadot types
