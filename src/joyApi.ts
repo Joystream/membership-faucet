@@ -1,11 +1,12 @@
-import { WsProvider, ApiPromise } from "@polkadot/api";
-import { types } from "@joystream/types";
+import { ApiPromise, WsProvider } from "@polkadot/api";
+import { createType, types } from "@joystream/types";
 import { Hash } from "@joystream/types/common";
-import { Callback, ISubmittableResult } from '@polkadot/types/types'
+import { Callback, ISubmittableResult } from "@polkadot/types/types";
 import { Keyring } from "@polkadot/keyring";
 import { config } from "dotenv";
 import { blake2AsHex } from "@polkadot/util-crypto";
-import { KeyringPair } from '@polkadot/keyring/types'
+import { KeyringPair } from "@polkadot/keyring/types";
+import { MembershipMetadata } from "@joystream/metadata-protobuf";
 
 // Init .env config
 config();
@@ -104,13 +105,16 @@ export class JoyApi {
       root_account: account,
       controller_account: account,
       handle: handle,
-      // TODO:
-      //  metadata: metadataToBytes(MembershipMetadata, {
-      //   about: about,
-      // }),
+        metadata: createType('Bytes', '0x' + Buffer.from(MembershipMetadata.encode({
+          about: about,
+          name: null,
+          avatar: null
+        }).finish()).toString('hex')),
     }).signAndSend(
       this.signingPair,
       callback
     )
   }
 }
+
+
