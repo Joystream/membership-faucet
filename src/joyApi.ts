@@ -4,18 +4,18 @@ import { Hash } from "@joystream/types/common";
 import { Callback, ISubmittableResult } from '@polkadot/types/types'
 import { Keyring } from "@polkadot/keyring";
 import { config } from "dotenv";
-import {blake2AsHex} from '@polkadot/util-crypto'
+import { blake2AsHex } from "@polkadot/util-crypto";
+import { KeyringPair } from '@polkadot/keyring/types'
 
 // Init .env config
 config();
-
-const aliceAddress = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
 
 export class JoyApi {
   endpoint: string;
   isReady: Promise<ApiPromise>;
   api!: ApiPromise;
   keyring: Keyring;
+  signingPair?: KeyringPair;
 
   constructor(endpoint?: string) {
     this.keyring = new Keyring()
@@ -33,7 +33,7 @@ export class JoyApi {
       this.api = instance;
       const screeningAuthoritySeed = process.env.SCREENING_AUTHORITY_SEED || '//Alice'
       // Fails unless we do this after api is ready
-      this.keyring.addFromUri(screeningAuthoritySeed, undefined, 'sr25519');
+      this.signingPair = this.keyring.addFromUri(screeningAuthoritySeed, undefined, 'sr25519');
       return this;
     });
   }
@@ -93,15 +93,11 @@ export class JoyApi {
   }
 
   async addScreenedMember(account: string, handle: string, avatar: string, about: string, callback: Callback<ISubmittableResult>) {
-    const addr = aliceAddress
-    let keyPair
-    try {
-      keyPair = this.keyring.getPair(addr)
-    } catch (err) {
-      throw new Error('Screening Authority Key Not Found In Keyring')
+    if(!this.signingPair) {
+      throw new Error('Inviting Member Key Not Found In Keyring')
     }
 
-    const invitingMemberId = '0'
+    const invitingMemberId = process.env.INVITING_MEMBER_ID ?? '0'
 
     return this.api.tx.members.inviteMember({
       inviting_member_id: invitingMemberId,
@@ -113,7 +109,7 @@ export class JoyApi {
       //   about: about,
       // }),
     }).signAndSend(
-      keyPair,
+      this.signingPair,
       callback
     )
   }
