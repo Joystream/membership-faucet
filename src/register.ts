@@ -1,37 +1,12 @@
 import { JoyApi } from "./joyApi";
-import { EventRecord } from '@polkadot/types/interfaces';
-import { decodeAddress } from '@polkadot/keyring'
-import { log } from './debug';
-import { DispatchError } from '@polkadot/types/interfaces/system'
-import { TypeRegistry } from '@polkadot/types'
-import BN from 'bn.js'
-import { MemberId } from '@joystream/types/common'
-import {AugmentedEvent, AugmentedEvents} from '@polkadot/api/types'
-
-// TODO: Move data from a library
-export type ExtractTuple<P> = P extends AugmentedEvent<'rxjs', infer T> ? T : never
-
-export const getDataFromEvent = <
-    Module extends keyof AugmentedEvents<'rxjs'>,
-    Event extends keyof AugmentedEvents<'rxjs'>[Module],
-    Tuple extends ExtractTuple<AugmentedEvents<'rxjs'>[Module][Event]>,
-    Index extends keyof Tuple
-    >(
-    events: EventRecord[],
-    module: Module,
-    eventName: Event,
-    index: Index = 0 as Index
-): Tuple[Index] | undefined => {
-  const eventRecord = events.find((event) => event.event.method === eventName)
-
-  if (!eventRecord) {
-    return
-  }
-
-  const data = eventRecord.event.data as unknown as Tuple
-
-  return data[index]
-}
+import { EventRecord } from "@polkadot/types/interfaces";
+import { decodeAddress } from "@polkadot/keyring";
+import { log } from "./debug";
+import { DispatchError } from "@polkadot/types/interfaces/system";
+import { TypeRegistry } from "@polkadot/types";
+import BN from "bn.js";
+import { MemberId} from "@joystream/types/common";
+import { getDataFromEvent } from "./utils";
 
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
