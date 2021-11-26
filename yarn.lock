@@ -228,9 +228,9 @@
     google-protobuf "^3.14.0"
     long "^4.0.0"
 
-"@joystream/types@https://gitpkg.now.sh/Joystream/joystream/types?olympia&scripts.postinstall=%26%26%20tsc%20--build%20tsconfig.json":
+"@joystream/types@https://gitpkg.now.sh/Joystream/joystream/types?olympia":
   version "0.17.0"
-  resolved "https://gitpkg.now.sh/Joystream/joystream/types?olympia&scripts.postinstall=%26%26%20tsc%20--build%20tsconfig.json#72507d6af00ba345f99ef9c64b979d78baf6ec64"
+  resolved "https://gitpkg.now.sh/Joystream/joystream/types?olympia#ab0179ac4d198e5453c571383dce2d1422613d29"
   dependencies:
     "@polkadot/api" "5.3.2"
     "@polkadot/keyring" "^7.1.1"
