@@ -11,6 +11,14 @@ import { MembershipMetadata } from "@joystream/metadata-protobuf";
 // Init .env config
 config();
 
+interface NewMember {
+  account: string
+  handle: string
+  avatar?: string
+  about?: string
+  name?: string
+}
+
 export class JoyApi {
   endpoint: string;
   isReady: Promise<ApiPromise>;
@@ -93,12 +101,13 @@ export class JoyApi {
     return blockHeader.number.toNumber()
   }
 
-  async addScreenedMember(account: string, handle: string, avatar: string, about: string, callback: Callback<ISubmittableResult>) {
+  async addScreenedMember(memberData: NewMember, callback: Callback<ISubmittableResult>) {
     if(!this.signingPair) {
       throw new Error('Inviting Member Key Not Found In Keyring')
     }
 
     const invitingMemberId = process.env.INVITING_MEMBER_ID ?? '0'
+    const {account, handle, about, name} = memberData
 
     return this.api.tx.members.inviteMember({
       inviting_member_id: invitingMemberId,
@@ -106,8 +115,9 @@ export class JoyApi {
       controller_account: account,
       handle: handle,
         metadata: createType('Bytes', '0x' + Buffer.from(MembershipMetadata.encode({
-          about: about,
-          name: null,
+          about: about ?? null,
+          name: name ?? null,
+          // TODO: Avatar is expected to be number ATM. Should accept string.
           avatar: null
         }).finish()).toString('hex')),
     }).signAndSend(

@@ -18,7 +18,7 @@ function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
 
 export type RegisterCallback = (result: any, statusCode: number) => void
 
-export async function register(joy: JoyApi, account: string, handle: string, avatar: string, about: string, callback: RegisterCallback) {
+export async function register(joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
   await joy.init
   const { api } = joy
 
@@ -68,7 +68,7 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
   }
 
   try {
-    const unsubscribe = await joy.addScreenedMember(account, handle, avatar, about, (result) => {
+    const unsubscribe = await joy.addScreenedMember({account, handle, name, avatar, about}, (result) => {
       if (!result.isCompleted) {
         return
       }
