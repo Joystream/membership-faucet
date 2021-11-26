@@ -126,6 +126,7 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
             callback({
               memberId,
               block: blockNumber,
+              blockHash
             }, 200)
           })
           .catch((reason) => {
