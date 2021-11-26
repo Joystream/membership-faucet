@@ -10,7 +10,8 @@
     "start": "node ./lib/app.js"
   },
   "dependencies": {
-    "@joystream/types": "https://gitpkg.now.sh/joystream/pioneer/packages/types?main",
+    "@joystream/metadata-protobuf": "https://gitpkg.now.sh/Joystream/joystream/metadata-protobuf?olympia",
+    "@joystream/types": "https://gitpkg.now.sh/Joystream/joystream/types?olympia",
     "@polkadot/api": "5.3.2",
     "@polkadot/api-derive": "5.3.2",
     "@polkadot/keyring": "7.1.1",
