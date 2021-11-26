@@ -9,6 +9,9 @@ import { MemberId} from "@joystream/types/common";
 import { getDataFromEvent } from "./utils";
 
 
+const MIN_HANDLE_LENGTH = 1;
+const MAX_HANDLE_LENGTH = 100;
+
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
   return getDataFromEvent(events, 'members', 'MemberInvited', 0)
 }
@@ -38,9 +41,8 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
     return
   }
 
-  // validate handle @todo
-  const minHandleLength = new BN(3) // await joy.api.query.members.minHandleLength()
-  const maxHandleLength = new BN(20) // await joy.api.query.members.maxHandleLength()
+  const minHandleLength = new BN(MIN_HANDLE_LENGTH)
+  const maxHandleLength = new BN(MAX_HANDLE_LENGTH)
 
   if(maxHandleLength.ltn(handle.length)) {
     callback({
