@@ -10,7 +10,7 @@
     "start": "node ./lib/app.js"
   },
   "dependencies": {
-    "@joystream/types": "0.17.1",
+    "@joystream/types": "0.17.2",
     "@polkadot/api": "^5.9.1",
     "@polkadot/api-derive": "^5.9.1",
     "@polkadot/keyring": "^7.3.1",
