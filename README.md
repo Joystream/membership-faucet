@@ -38,7 +38,9 @@ On success expect a JSON response:
 
 ```
 {
-    "memberId": 21
+    "memberId": 21,
+    "block": 1337,
+    "blockHash": "0xb3f394043b4a0dde625a630486f6e64388f124aa9ba4f7f23d54d4fc5a94ea82"
 }
 ```
 

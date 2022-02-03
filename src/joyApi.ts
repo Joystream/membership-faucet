@@ -1,23 +1,30 @@
-import { WsProvider, ApiPromise } from "@polkadot/api";
-import { types } from "@joystream/types";
+import { ApiPromise, WsProvider } from "@polkadot/api";
+import { createType, types } from "@joystream/types";
 import { Hash } from "@joystream/types/common";
-import { Callback, ISubmittableResult } from '@polkadot/types/types'
+import { Callback, ISubmittableResult } from "@polkadot/types/types";
 import { Keyring } from "@polkadot/keyring";
 import { config } from "dotenv";
-import BN from "bn.js";
+import { blake2AsHex } from "@polkadot/util-crypto";
+import { KeyringPair } from "@polkadot/keyring/types";
+import { MembershipMetadata } from "@joystream/metadata-protobuf";
 
 // Init .env config
 config();
 
-const MIN_ENDOWMENT = '1'
-const endowment = process.env.ENDOWMENT || MIN_ENDOWMENT
-const ENDOWMENT = new BN(parseInt(endowment))
+interface NewMember {
+  account: string
+  handle: string
+  avatar?: string
+  about?: string
+  name?: string
+}
 
 export class JoyApi {
   endpoint: string;
   isReady: Promise<ApiPromise>;
   api!: ApiPromise;
   keyring: Keyring;
+  signingPair?: KeyringPair;
 
   constructor(endpoint?: string) {
     this.keyring = new Keyring()
@@ -35,7 +42,7 @@ export class JoyApi {
       this.api = instance;
       const screeningAuthoritySeed = process.env.SCREENING_AUTHORITY_SEED || '//Alice'
       // Fails unless we do this after api is ready
-      this.keyring.addFromUri(screeningAuthoritySeed, undefined, 'sr25519');
+      this.signingPair = this.keyring.addFromUri(screeningAuthoritySeed, undefined, 'sr25519');
       return this;
     });
   }
@@ -78,7 +85,8 @@ export class JoyApi {
   }
 
   async handleIsAlreadyRegistered(handle: string): Promise<boolean> {
-    const storageSize = await this.api.query.members.memberIdByHandle.size(handle)
+    const handleHash = blake2AsHex(handle)
+    const storageSize = await this.api.query.members.memberIdByHandleHash.size(handleHash)
     return !storageSize.eq(0)
   }
 
@@ -93,19 +101,30 @@ export class JoyApi {
     return blockHeader.number.toNumber()
   }
 
-  async addScreenedMember(account: string, handle: string, avatar: string, about: string, callback: Callback<ISubmittableResult>) {
-    const authAccountId = await this.api.query.members.screeningAuthority()
-    const addr = this.keyring.encodeAddress(authAccountId)
-    let keyPair
-    try {
-      keyPair = this.keyring.getPair(addr)
-    } catch (err) {
-      throw new Error('Screening Authority Key Not Found In Keyring')
+  async addScreenedMember(memberData: NewMember, callback: Callback<ISubmittableResult>) {
+    if(!this.signingPair) {
+      throw new Error('Inviting Member Key Not Found In Keyring')
     }
 
-    return this.api.tx.members.addScreenedMember(account, handle, avatar, about, ENDOWMENT).signAndSend(
-      keyPair,
+    const invitingMemberId = process.env.INVITING_MEMBER_ID ?? '0'
+    const {account, handle, about, name} = memberData
+
+    return this.api.tx.members.inviteMember({
+      inviting_member_id: invitingMemberId,
+      root_account: account,
+      controller_account: account,
+      handle: handle,
+        metadata: createType('Bytes', '0x' + Buffer.from(MembershipMetadata.encode({
+          about: about ?? null,
+          name: name ?? null,
+          // TODO: Avatar is expected to be number ATM. Should accept string.
+          avatar: null
+        }).finish()).toString('hex')),
+    }).signAndSend(
+      this.signingPair,
       callback
     )
   }
 }
+
+

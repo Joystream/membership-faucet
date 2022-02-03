@@ -1,23 +1,24 @@
 import { JoyApi } from "./joyApi";
-import { EventRecord } from '@polkadot/types/interfaces';
-import { MemberId } from '@joystream/types/members';
-import { decodeAddress } from '@polkadot/keyring'
-import { log } from './debug';
-import { DispatchError } from '@polkadot/types/interfaces/system'
-import { TypeRegistry } from '@polkadot/types'
+import { EventRecord } from "@polkadot/types/interfaces";
+import { decodeAddress } from "@polkadot/keyring";
+import { log } from "./debug";
+import { DispatchError } from "@polkadot/types/interfaces/system";
+import { TypeRegistry } from "@polkadot/types";
+import BN from "bn.js";
+import { MemberId} from "@joystream/types/common";
+import { getDataFromEvent } from "./utils";
+
+
+const MIN_HANDLE_LENGTH = 1;
+const MAX_HANDLE_LENGTH = 100;
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
-  const record = events.find((record) => record.event.section === "members" && record.event.method === "MemberRegistered")
-  if (record) {
-    return record.event.data[0] as MemberId
-  } else {
-    return undefined
-  }
+  return getDataFromEvent(events, 'members', 'MemberInvited', 0)
 }
 
 export type RegisterCallback = (result: any, statusCode: number) => void
 
-export async function register(joy: JoyApi, account: string, handle: string, avatar: string, about: string, callback: RegisterCallback) {
+export async function register(joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
   await joy.init
   const { api } = joy
 
@@ -40,9 +41,8 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
     return
   }
 
-  // validate handle
-  const minHandleLength = await joy.api.query.members.minHandleLength()
-  const maxHandleLength = await joy.api.query.members.maxHandleLength()
+  const minHandleLength = new BN(MIN_HANDLE_LENGTH)
+  const maxHandleLength = new BN(MAX_HANDLE_LENGTH)
 
   if(maxHandleLength.ltn(handle.length)) {
     callback({
@@ -68,7 +68,7 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
   }
 
   try {
-    const unsubscribe = await joy.addScreenedMember(account, handle, avatar, about, (result) => {
+    const unsubscribe = await joy.addScreenedMember({account, handle, name, avatar, about}, (result) => {
       if (!result.isCompleted) {
         return
       }
@@ -103,6 +103,7 @@ export async function register(joy: JoyApi, account: string, handle: string, ava
             callback({
               memberId,
               block: blockNumber,
+              blockHash
             }, 200)
           })
           .catch((reason) => {
