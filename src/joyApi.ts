@@ -117,8 +117,7 @@ export class JoyApi {
         metadata: createType('Bytes', '0x' + Buffer.from(MembershipMetadata.encode({
           about: about ?? null,
           name: name ?? null,
-          // TODO: Avatar is expected to be number ATM. Should accept string.
-          avatar: null
+          avatarUri: null,
         }).finish()).toString('hex')),
     }).signAndSend(
       this.signingPair,

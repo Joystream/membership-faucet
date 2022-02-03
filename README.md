@@ -7,17 +7,17 @@ Membership on-boarding service for Joystream network.
 Clone the repo, then run:
 
 ```
-$ yarn install
+$ npm install
 ```
 
-to install. 
+to install dependencies. 
 
 ## Run
 Add your config variables to `env.example` and rename it to `.env` and then run:
 
 ```
-$ yarn build
-$ yarn start
+$ npm run build
+$ npm run start
 ```
 
 Will build and start the server.

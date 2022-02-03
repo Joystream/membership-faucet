@@ -3,18 +3,19 @@ FROM node:14 AS build
 WORKDIR /faucet
 
 COPY . .
-RUN yarn install --frozen-lockfile
-RUN yarn run build
-
+RUN npm install --frozen-lockfile
+RUN npm run build
 
 FROM node:14
 
 WORKDIR /faucet
 
 COPY package.json .
-COPY yarn.lock .
+COPY package-lock.json .
+COPY joystream-metadata-protobuf-2.0.0.tgz .
+COPY joystream-types-0.18.0.tgz .
 COPY --from=build /faucet/lib/ /faucet/lib/
-RUN yarn install --frozen-lockfile --production
+RUN npm install --frozen-lockfile --production
 
-CMD ["yarn", "start"]
+CMD ["npm", "run", "start"]
 
