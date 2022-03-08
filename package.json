@@ -10,8 +10,8 @@
     "start": "node ./lib/app.js"
   },
   "dependencies": {
-    "@joystream/metadata-protobuf": "./joystream-metadata-protobuf-2.0.0.tgz",
-    "@joystream/types": "./joystream-types-0.18.0.tgz",
+    "@joystream/metadata-protobuf": "^2.0.0",
+    "@joystream/types": "^0.18.2",
     "@polkadot/api": "5.9.1",
     "@polkadot/keyring": "7.3.1",
     "@polkadot/util": "7.3.1",
