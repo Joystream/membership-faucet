@@ -107,7 +107,7 @@ export class JoyApi {
     }
 
     const invitingMemberId = process.env.INVITING_MEMBER_ID ?? '0'
-    const {account, handle, about, name} = memberData
+    const {account, handle, about, name, avatar} = memberData
 
     return this.api.tx.members.inviteMember({
       inviting_member_id: invitingMemberId,
@@ -117,7 +117,7 @@ export class JoyApi {
         metadata: createType('Bytes', '0x' + Buffer.from(MembershipMetadata.encode({
           about: about ?? null,
           name: name ?? null,
-          avatarUri: null,
+          avatarUri: avatar,
         }).finish()).toString('hex')),
     }).signAndSend(
       this.signingPair,
