@@ -225,10 +225,10 @@
     long "^4.0.0"
     protobufjs "^6.11.2"
 
-"@joystream/types@^0.18.2":
-  version "0.18.2"
-  resolved "https://registry.yarnpkg.com/@joystream/types/-/types-0.18.2.tgz#fd82d28cb14145784d3b3e18857fa8df76c97a01"
-  integrity sha512-ylvC0g3BjirWhbrlgkWLnCzcIntzlFwnObNyYCQ7pV4//TrwGPeS6ozdKnFNlzUz/xRfY3GMCedl5Sa6Def5BQ==
+"@joystream/types@^0.19.2":
+  version "0.19.2"
+  resolved "https://registry.yarnpkg.com/@joystream/types/-/types-0.19.2.tgz#72e579c721ae5282eb96f44d62cf332713e3b1e6"
+  integrity sha512-centybpLDMwtej3FQDsoda9G0KNoVRn2P7D3grHmYZILhIVRuoda77mfxmELgyjuTEq2qROdv6+7BjlqafMefQ==
   dependencies:
     "@polkadot/api" "5.9.1"
     "@polkadot/keyring" "7.3.1"
