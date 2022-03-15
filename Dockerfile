@@ -12,8 +12,6 @@ WORKDIR /faucet
 
 COPY package.json .
 COPY package-lock.json .
-COPY joystream-metadata-protobuf-2.0.0.tgz .
-COPY joystream-types-0.18.0.tgz .
 COPY --from=build /faucet/lib/ /faucet/lib/
 RUN npm install --frozen-lockfile --production
 
