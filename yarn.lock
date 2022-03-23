@@ -211,10 +211,10 @@
   dependencies:
     "@cspotcode/source-map-consumer" "0.8.0"
 
-"@joystream/metadata-protobuf@^2.0.0":
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/@joystream/metadata-protobuf/-/metadata-protobuf-2.0.0.tgz#6a06a5536bfebc2b97ac4b94de8eeca64d8b629f"
-  integrity sha512-hjYHpES1crbczA+bh76TdHFX6T4GNU948JMDZamSkX5bm9ATulL/B1FNLwa7mw/4zqrA8SoLEYWQ4AU+1aj4Qg==
+"@joystream/metadata-protobuf@^2.1.0":
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/@joystream/metadata-protobuf/-/metadata-protobuf-2.1.0.tgz#1cad1ee51374567e0b166e28370d90251898e7fc"
+  integrity sha512-hhKJwLEFLY1GQ2lW6cmc24gcgrnCLPGCQs/ud+VikUif0bdExo3ijRBZ1POpDrVXRC2Y8o9fYE7fOelxHpdeuw==
   dependencies:
     "@types/iso-3166-2" "^1.0.0"
     "@types/long" "^4.0.1"
@@ -225,10 +225,10 @@
     long "^4.0.0"
     protobufjs "^6.11.2"
 
-"@joystream/types@^0.18.2":
-  version "0.18.2"
-  resolved "https://registry.yarnpkg.com/@joystream/types/-/types-0.18.2.tgz#fd82d28cb14145784d3b3e18857fa8df76c97a01"
-  integrity sha512-ylvC0g3BjirWhbrlgkWLnCzcIntzlFwnObNyYCQ7pV4//TrwGPeS6ozdKnFNlzUz/xRfY3GMCedl5Sa6Def5BQ==
+"@joystream/types@^0.18.3":
+  version "0.18.3"
+  resolved "https://registry.yarnpkg.com/@joystream/types/-/types-0.18.3.tgz#de8761be6f6a5e9a88668d07b56f1912ecaf9906"
+  integrity sha512-xoWcn61FjZ8BZYcU+XHsWTyO0ANXFud+2GNex+sUkpFE7FgIGVJ3tqPU4MTqjlyeAqHsGXcNpXpd9gkJIDVwzA==
   dependencies:
     "@polkadot/api" "5.9.1"
     "@polkadot/keyring" "7.3.1"
