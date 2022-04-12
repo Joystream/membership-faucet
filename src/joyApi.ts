@@ -17,6 +17,7 @@ interface NewMember {
   avatar?: string
   about?: string
   name?: string
+  invitingMemberId?: string
 }
 
 export class JoyApi {
@@ -106,11 +107,11 @@ export class JoyApi {
       throw new Error('Inviting Member Key Not Found In Keyring')
     }
 
-    const invitingMemberId = process.env.INVITING_MEMBER_ID ?? '0'
-    const {account, handle, about, name, avatar} = memberData
+    const invitingMemberIdFallback = process.env.INVITING_MEMBER_ID ?? '0'
+    const {account, handle, about, name, avatar, invitingMemberId} = memberData
 
     return this.api.tx.members.inviteMember({
-      inviting_member_id: invitingMemberId,
+      inviting_member_id: invitingMemberId ?? invitingMemberIdFallback,
       root_account: account,
       controller_account: account,
       handle: handle,

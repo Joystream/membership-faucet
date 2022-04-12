@@ -18,7 +18,7 @@ function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
 
 export type RegisterCallback = (result: any, statusCode: number) => void
 
-export async function register(joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
+export async function register(joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, invitingMemberId: string | undefined, callback: RegisterCallback) {
   await joy.init
   const { api } = joy
 
@@ -39,6 +39,12 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
       error: 'OnlyNewAccountsCanBeUsedForScreenedMembers'
     }, 400)
     return
+  }
+
+  if(invitingMemberId && !(await api.query.members.membershipById(Number(invitingMemberId)))) {
+    callback({
+      error: 'InvitingMemberNotFound'
+    }, 400)
   }
 
   const minHandleLength = new BN(MIN_HANDLE_LENGTH)
@@ -68,7 +74,7 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
   }
 
   try {
-    const unsubscribe = await joy.addScreenedMember({account, handle, name, avatar, about}, (result) => {
+    const unsubscribe = await joy.addScreenedMember({account, handle, name, avatar, about, invitingMemberId}, (result) => {
       if (!result.isCompleted) {
         return
       }
