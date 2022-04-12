@@ -41,7 +41,7 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
     return
   }
 
-  if(invitingMemberId && !(await api.query.members.membershipById(Number(invitingMemberId)))) {
+  if(invitingMemberId && (await api.query.members.membershipById(invitingMemberId)).isEmpty) {
     callback({
       error: 'InvitingMemberNotFound'
     }, 400)
