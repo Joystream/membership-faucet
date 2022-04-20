@@ -1,12 +1,11 @@
-import { JoyApi } from "./joyApi";
+import { BALANCE_TOP_UP_AMOUNT, ErrorWithData, JoyApi } from "./joyApi";
 import { EventRecord } from "@polkadot/types/interfaces";
 import { decodeAddress } from "@polkadot/keyring";
-import { log } from "./debug";
-import { DispatchError } from "@polkadot/types/interfaces/system";
-import { TypeRegistry } from "@polkadot/types";
+import { log, error } from "./debug";
 import BN from "bn.js";
-import { MemberId} from "@joystream/types/common";
+import { Hash, MemberId} from "@joystream/types/common";
 import { getDataFromEvent } from "./utils";
+import { formatBalance } from "@polkadot/util";
 
 
 const MIN_HANDLE_LENGTH = 1;
@@ -18,9 +17,14 @@ function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
 
 export type RegisterCallback = (result: any, statusCode: number) => void
 
+export type RegisterBlockData = { block: null } | { block: number, blockHash: Hash }
+export type RegisterResult = {
+  memberId?: MemberId,
+  topUpSuccessful: boolean
+} & RegisterBlockData
+
 export async function register(joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
   await joy.init
-  const { api } = joy
 
   // Validate address
   try {
@@ -67,74 +71,50 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
     return
   }
 
-  try {
-    const unsubscribe = await joy.addScreenedMember({account, handle, name, avatar, about}, (result) => {
-      if (!result.isCompleted) {
-        return
-      }
-
-      unsubscribe()
-
-      if (result.isError) {
-        log('Failed to register:', result)
-        const { isDropped, isFinalityTimeout, isInvalid, isUsurped } = result.status
-        callback({
-          error: 'TransactionError',
-          reason: {
-            isDropped,
-            isFinalityTimeout,
-            isInvalid,
-            isUsurped,
-          },
-        }, 400)
-        return
-      }
-
-      const success = result.findRecord('system', 'ExtrinsicSuccess')
-      const failed = result.findRecord('system', 'ExtrinsicFailed')
-
-      if(success) {
-        let memberId = memberIdFromEvent(result.events)
-        log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
-
-        const blockHash = result.status.asInBlock
-        joy.blockHeightFromHash(blockHash)
-          .then((blockNumber) => {
-            callback({
-              memberId,
-              block: blockNumber,
-              blockHash
-            }, 200)
-          })
-          .catch((reason) => {
-            log('Failed to get extrinsic block number', reason)
-            callback({
-              memberId,
-              block: null,
-            }, 200)
-          })
-      } else {
-        let errMessage = 'UnknownError'
-        const record = failed as EventRecord
-        const {
-          event: { data },
-        } = record
-        const err = data[0] as DispatchError
-        if (err.isModule) {
-          const { name } = (api.registry as TypeRegistry).findMetaError(err.asModule)
-          errMessage = name
-        }
-        log('Failed to register:', errMessage)
-        callback({
-          error: errMessage,
-        }, 400)
-      }
-    })
-  } catch (err) {
-    log(err)
-    callback({
-      error: 'InternalServerError'
-    }, 500)
+  const handleRegisterError = (err: unknown) => {
+    error(err)
+    if (err instanceof ErrorWithData) {
+      callback(err.data, err.code)
+    } else {
+      callback({
+        error: 'InternalServerError'
+      }, 500)
+    }
   }
+
+  let memberId: MemberId | undefined
+  let registeredAtBlock: RegisterBlockData
+  let topUpSuccessful: boolean
+
+  try {
+    const result = await joy.addScreenedMember({account, handle, name, avatar, about})
+    memberId = memberIdFromEvent(result.events)
+    log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
+
+    // Try to include block information
+    const blockHash = result.status.asInBlock
+    try {
+      const blockNumber = await joy.blockHeightFromHash(blockHash)
+      registeredAtBlock = { block: blockNumber, blockHash }
+    } catch (reason) {
+      error('Failed to get extrinsic block number', reason)
+      registeredAtBlock = { block: null }
+    }
+  } catch (err) {
+    handleRegisterError(err)
+    return
+  }
+
+  try {
+    await joy.topUpBalance(account)
+    log('Balance of account :', account, 'topped up with:', formatBalance(BALANCE_TOP_UP_AMOUNT))
+    topUpSuccessful = true
+  } catch (err) {
+    topUpSuccessful = false
+    error('Failed to top up balance of account:', account, 'Error:', err)
+  }
+
+  let result: RegisterResult = { memberId, ...registeredAtBlock, topUpSuccessful };
+  callback(result, 200)
 }
 
