@@ -25,7 +25,7 @@
     "inquirer": "^7.3.3",
     "locks": "^0.2.2",
     "lowdb": "^1.0.0",
-    "moment": "^2.27.0",
+    "moment": "^2.29.3",
     "pm2": "^5.1.2"
   },
   "devDependencies": {
