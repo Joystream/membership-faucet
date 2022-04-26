@@ -7,9 +7,35 @@ import { config } from "dotenv";
 import { blake2AsHex } from "@polkadot/util-crypto";
 import { KeyringPair } from "@polkadot/keyring/types";
 import { MembershipMetadata } from "@joystream/metadata-protobuf";
+import { SubmittableExtrinsic } from "@polkadot/api/types";
+import { DispatchError } from "@polkadot/types/interfaces/system";
+import { error } from "./debug";
 
 // Init .env config
 config();
+
+export const BALANCE_TOP_UP_AMOUNT = 10;
+
+export class ErrorWithData extends Error {
+  code: number = 400;
+  additionalData: Record<string, unknown> = {}
+
+  get data() {
+    return {
+      error: this.message,
+      ...this.additionalData
+    }
+  }
+}
+
+export class TransactionError extends ErrorWithData {
+  constructor(data: Record<string, unknown>) {
+    super('TransactionError')
+    this.additionalData = data
+  }
+}
+
+export class TransactionProcessingError extends ErrorWithData {}
 
 interface NewMember {
   account: string
@@ -101,15 +127,11 @@ export class JoyApi {
     return blockHeader.number.toNumber()
   }
 
-  async addScreenedMember(memberData: NewMember, callback: Callback<ISubmittableResult>) {
-    if(!this.signingPair) {
-      throw new Error('Inviting Member Key Not Found In Keyring')
-    }
-
+  async addScreenedMember(memberData: NewMember) {
     const invitingMemberId = process.env.INVITING_MEMBER_ID ?? '0'
     const {account, handle, about, name, avatar} = memberData
 
-    return this.api.tx.members.inviteMember({
+    return this.sendAndProcessTx(this.api.tx.members.inviteMember({
       inviting_member_id: invitingMemberId,
       root_account: account,
       controller_account: account,
@@ -119,10 +141,66 @@ export class JoyApi {
           name: name ?? null,
           avatarUri: avatar,
         }).finish()).toString('hex')),
-    }).signAndSend(
-      this.signingPair,
-      callback
-    )
+    }))
+  }
+
+  async topUpBalance(address: string) {
+    return this.sendAndProcessTx(this.api.tx.balances.transferKeepAlive(address, BALANCE_TOP_UP_AMOUNT))
+  }
+
+  async sendAndProcessTx(tx: SubmittableExtrinsic<'promise'>): Promise<ISubmittableResult> {
+    const signingPair = this.signingPair
+
+    if(!signingPair) {
+      throw new Error('Inviting Member Key Not Found In Keyring')
+    }
+
+    return new Promise(async (resolve, reject) => {
+      const callback: Callback<ISubmittableResult> = (result) => {
+        if (!result.isCompleted) {
+          return
+        }
+  
+        unsubscribe()
+  
+        if (result.isError) {
+          error('Transaction failed:', result)
+          const { isDropped, isFinalityTimeout, isInvalid, isUsurped } = result.status
+          return reject(new TransactionError({
+            reason: {
+              isDropped,
+              isFinalityTimeout,
+              isInvalid,
+              isUsurped,
+            }
+          }))
+        }
+  
+        const success = result.findRecord('system', 'ExtrinsicSuccess')
+        const failed = result.findRecord('system', 'ExtrinsicFailed')
+  
+        if (success) {
+          resolve(result)
+        } else if (failed) {
+          let errMessage = 'UnknownError'
+          const record = failed
+          const {
+            event: { data },
+          } = record
+          const err = data[0] as DispatchError
+          if (err.isModule) {
+            const { name } = this.api.registry.findMetaError(err.asModule)
+            errMessage = name
+          }
+          error('Transaction processing failed:', errMessage)
+          reject(new TransactionProcessingError(errMessage))
+        } else {
+          error('Unexpected extrinsic result:', result);
+          reject(new Error('Unexpected extrinsic result'));
+        }
+      }
+      const unsubscribe = await tx.signAndSend(signingPair, callback)
+    })
   }
 }
 
