@@ -6,7 +6,7 @@ import BN from "bn.js";
 import { Hash, MemberId} from "@joystream/types/common";
 import { getDataFromEvent } from "./utils";
 import { formatBalance } from "@polkadot/util";
-
+import { sendEmailAlert } from "./emailAlert";
 
 const MIN_HANDLE_LENGTH = 1;
 const MAX_HANDLE_LENGTH = 100;
@@ -102,6 +102,7 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
     }
   } catch (err) {
     handleRegisterError(err)
+    sendEmailAlert(`Failed to register new member. ${err}`)
     return
   }
 
@@ -112,6 +113,7 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
   } catch (err) {
     topUpSuccessful = false
     error('Failed to top up balance of account:', account, 'Error:', err)
+    sendEmailAlert(`Failed to top up balance for new account ${account}. ${err}`)
   }
 
   let result: RegisterResult = { memberId, ...registeredAtBlock, topUpSuccessful };
