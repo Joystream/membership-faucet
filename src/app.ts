@@ -6,15 +6,29 @@ import { register } from './register'
 import { AnyJson } from "@polkadot/types/types";
 import bodyParser from 'body-parser';
 import locks from "locks";
+import rateLimit from 'express-rate-limit';
+
+const registerLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 2, // Limit each IP to N requests per `window`
+  standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: true, // Disable the `X-RateLimit-*` headers
+})
 
 const app = express();
-const port = process.env.PORT || 3002;
+const port = parseInt(process.env.PORT || '3002');
 const joy = new JoyApi();
 app.use(bodyParser.json())
 
 const processingRequest = locks.createMutex();
 
 app.use(cors());
+
+// Configure number of hops behind reverse proxy
+app.set('trust proxy', 1)
+// ip endpoint to show request ip address for debugging
+app.get('/ip', (request, response) => response.send(request.ip))
+
 app.get("/status", async (req, res) => {
   await joy.init
   const { isSyncing } = await joy.api.rpc.system.health()
@@ -34,7 +48,7 @@ app.get("/status", async (req, res) => {
   }
 });
 
-app.post("/register", async (req, res) => {
+app.post("/register", registerLimiter, async (req, res) => {
   await joy.init
 
   // if node is still syncing .. don't process request
