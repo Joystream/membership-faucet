@@ -9,8 +9,8 @@ import locks from "locks";
 import rateLimit from 'express-rate-limit';
 
 const registerLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000,
-  max: 2, // Limit each IP to N requests per `window`
+  windowMs: 48 * 60 * 60 * 1000,
+  max: 3, // Limit each IP to N requests per `window`
   standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: true, // Disable the `X-RateLimit-*` headers
 })
