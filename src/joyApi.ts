@@ -14,7 +14,7 @@ import { error } from "./debug";
 // Init .env config
 config();
 
-export const BALANCE_TOP_UP_AMOUNT = 10;
+export const BALANCE_TOP_UP_AMOUNT = parseInt(process.env.BALANCE_TOP_UP_AMOUNT || '')
 
 export class ErrorWithData extends Error {
   code: number = 400;

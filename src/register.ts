@@ -84,7 +84,7 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
 
   let memberId: MemberId | undefined
   let registeredAtBlock: RegisterBlockData
-  let topUpSuccessful: boolean
+  let topUpSuccessful: boolean = false
 
   try {
     const result = await joy.addScreenedMember({account, handle, name, avatar, about})
@@ -106,14 +106,16 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
     return
   }
 
-  try {
-    await joy.topUpBalance(account)
-    log('Balance of account :', account, 'topped up with:', formatBalance(BALANCE_TOP_UP_AMOUNT))
-    topUpSuccessful = true
-  } catch (err) {
-    topUpSuccessful = false
-    error('Failed to top up balance of account:', account, 'Error:', err)
-    sendEmailAlert(`Failed to top up balance for new account ${account}. ${err}`)
+  if (BALANCE_TOP_UP_AMOUNT) {
+    try {
+      await joy.topUpBalance(account)
+      log('Balance of account :', account, 'topped up with:', formatBalance(BALANCE_TOP_UP_AMOUNT))
+      topUpSuccessful = true
+    } catch (err) {
+      topUpSuccessful = false
+      error('Failed to top up balance of account:', account, 'Error:', err)
+      sendEmailAlert(`Failed to top up balance for new account ${account}. ${err}`)
+    }
   }
 
   let result: RegisterResult = { memberId, ...registeredAtBlock, topUpSuccessful };
