@@ -7,6 +7,13 @@ import { Hash, MemberId} from "@joystream/types/common";
 import { getDataFromEvent } from "./utils";
 import { formatBalance } from "@polkadot/util";
 import { sendEmailAlert } from "./emailAlert";
+import { InMemoryRateLimiter } from "rolling-rate-limiter";
+
+// global rate limit
+const rollingLimiter = new InMemoryRateLimiter({
+  interval: 1 * 60 * 60 * 1000, // milliseconds
+  maxInInterval: 10,
+});
 
 const MIN_HANDLE_LENGTH = 1;
 const MAX_HANDLE_LENGTH = 100;
@@ -80,6 +87,26 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
         error: 'InternalServerError'
       }, 500)
     }
+  }
+
+  // Check inviting members has invites
+  const hasInvites = await joy.invitingMemberHasInvites()
+  // Check inviting member has balance to top up new member account
+  const hasBalance = await joy.invitingMemberHasTopUpBalance()
+  // Check membership working group has budget
+  const workingGroupHasBudget = await joy.workingGroupHasBudget()
+
+  const canInviteMember = hasInvites && hasBalance && workingGroupHasBudget
+
+  if(!canInviteMember) {
+    // send email alert faucet is exhausted
+    return callback('FaucetExhausted', 400)
+  }
+
+  // apply limit for global api call
+  const wasBlocked = await rollingLimiter.limit('register')
+  if (wasBlocked) {
+      return callback("TooManyRequests", 429);
   }
 
   let memberId: MemberId | undefined

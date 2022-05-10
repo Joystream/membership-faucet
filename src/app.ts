@@ -7,7 +7,6 @@ import { AnyJson } from "@polkadot/types/types";
 import bodyParser from 'body-parser';
 import locks from "locks";
 import expressRateLimit from 'express-rate-limit';
-import { InMemoryRateLimiter } from "rolling-rate-limiter";
 
 // per IP rate limit
 const expressIpLimiter = expressRateLimit({
@@ -16,12 +15,6 @@ const expressIpLimiter = expressRateLimit({
   standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: true, // Disable the `X-RateLimit-*` headers
 })
-
-// global rate limit
-const rollingGlobalLimiter = new InMemoryRateLimiter({
-  interval: 1 * 60 * 60 * 1000, // milliseconds
-  maxInInterval: 10,
-});
 
 const app = express();
 const port = parseInt(process.env.PORT || '3002');
@@ -59,15 +52,6 @@ app.get("/status", async (req, res) => {
 
 app.post("/register",
   expressIpLimiter,
-  (req, res, next) => {
-    rollingGlobalLimiter.limit('global').then((wasBlocked) => {
-      if (wasBlocked) {
-        return res.status(429).send("Too many requests");
-      } else {
-        return next();
-      }
-    });
-  },
   async (req, res) => {
     await joy.init
 
