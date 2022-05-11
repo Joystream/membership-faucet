@@ -50,40 +50,37 @@ app.get("/status", async (req, res) => {
   }
 });
 
-app.post("/register",
-  expressIpLimiter,
-  async (req, res) => {
-    await joy.init
+app.post("/register", expressIpLimiter, async (req, res) => {
+  await joy.init
 
-    // if node is still syncing .. don't process request
-    const { isSyncing } = await joy.api.rpc.system.health()
-    if (isSyncing.isTrue) {
-      res.setHeader("Content-Type", "application/json");
-      res.status(500).send({
-        error: 'NodeNotReady'
-      });
-      return
-    }
-
-    const callback = (result: AnyJson, statusCode: number) => {
-      processingRequest.unlock();
-      res.setHeader("Content-Type", "application/json");
-      res.status(statusCode).send(result);
-    }
-
-    const { account, handle, avatar, about, name } = req.body
-
-    processingRequest.lock(async () => {
-      try {
-        await register(joy, account, handle, name, avatar, about, callback);
-      } catch (err) {
-        processingRequest.unlock();
-        log(err)
-        res.status(500).end()
-      }
-    })
+  // if node is still syncing .. don't process request
+  const { isSyncing } = await joy.api.rpc.system.health()
+  if (isSyncing.isTrue) {
+    res.setHeader("Content-Type", "application/json");
+    res.status(500).send({
+      error: 'NodeNotReady'
+    });
+    return
   }
-);
+
+  const callback = (result: AnyJson, statusCode: number) => {
+    processingRequest.unlock();
+    res.setHeader("Content-Type", "application/json");
+    res.status(statusCode).send(result);
+  }
+
+  const { account, handle, avatar, about, name } = req.body
+
+  processingRequest.lock(async () => {
+    try {
+      await register(joy, account, handle, name, avatar, about, callback);
+    } catch (err) {
+      processingRequest.unlock();
+      log(err)
+      res.status(500).end()
+    }
+  })
+});
 
 app.listen(port, () => {
   log(`server started at http://localhost:${port}`);
