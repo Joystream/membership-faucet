@@ -100,6 +100,12 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
 
   if(!canInviteMember) {
     // send email alert faucet is exhausted
+    sendEmailAlert(`Faucet is exhausted
+Inviting member has enough invites: ${hasInvites}
+Inviting member has enough topup balance: ${hasBalance}
+Members Working group has sufficient budget: ${workingGroupHasBudget}
+    `)
+
     return callback('FaucetExhausted', 400)
   }
 
