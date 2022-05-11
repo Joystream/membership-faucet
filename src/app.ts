@@ -51,6 +51,8 @@ app.get("/status", async (req, res) => {
 });
 
 app.post("/register", expressIpLimiter, async (req, res) => {
+  log(`register request for ${req.body.handle} from ${req.ip}`)
+
   await joy.init
 
   // if node is still syncing .. don't process request
