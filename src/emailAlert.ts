@@ -22,14 +22,13 @@ const ALERT_TO_EMAIL = process.env.ALERT_TO_EMAIL
 
 sendgrid.setApiKey(SENDGRID_API_KEY || '')
 
-// limit email alerts to 1 per 30min
 export const sendEmailAlert = async (message: string) => {
     if (!(SENDGRID_API_KEY && ALERT_FROM_EMAIL && ALERT_TO_EMAIL)) {
         log('Email alert not sent - not configured')
         return
     }
 
-    const wasBlocked = await rollingLimiter.limit('register')
+    const wasBlocked = await rollingLimiter.limit('email')
     if (wasBlocked) {
         return log('Email alert not sent - throttling');
     }

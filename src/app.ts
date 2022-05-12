@@ -12,8 +12,8 @@ import expressRateLimit from 'express-rate-limit';
 const expressIpLimiter = expressRateLimit({
   windowMs: 48 * 60 * 60 * 1000,
   max: 3, // Limit each IP to N requests per `window`
-  standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: true, // Disable the `X-RateLimit-*` headers
+  standardHeaders: false, // Do not return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 })
 
 const app = express();

@@ -99,6 +99,9 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
   const canInviteMember = hasInvites && hasBalance && workingGroupHasBudget
 
   if(!canInviteMember) {
+    // log faucet exhausted
+    log('Faucet exhausted')
+
     // send email alert faucet is exhausted
     sendEmailAlert(`Faucet is exhausted
 Inviting member has enough invites: ${hasInvites}
