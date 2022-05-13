@@ -6,15 +6,7 @@ import { register } from './register'
 import { AnyJson } from "@polkadot/types/types";
 import bodyParser from 'body-parser';
 import locks from "locks";
-import expressRateLimit from 'express-rate-limit';
-
-// per IP rate limit
-const expressIpLimiter = expressRateLimit({
-  windowMs: 48 * 60 * 60 * 1000,
-  max: 3, // Limit each IP to N requests per `window`
-  standardHeaders: false, // Do not return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-})
+// import expressRateLimit from 'express-rate-limit';
 
 const app = express();
 const port = parseInt(process.env.PORT || '3002');
@@ -50,7 +42,7 @@ app.get("/status", async (req, res) => {
   }
 });
 
-app.post("/register", expressIpLimiter, async (req, res) => {
+app.post("/register", async (req, res) => {
   log(`register request for ${req.body.handle} from ${req.ip}`)
 
   await joy.init
@@ -75,7 +67,7 @@ app.post("/register", expressIpLimiter, async (req, res) => {
 
   processingRequest.lock(async () => {
     try {
-      await register(joy, account, handle, name, avatar, about, callback);
+      await register(req.ip, joy, account, handle, name, avatar, about, callback);
     } catch (err) {
       processingRequest.unlock();
       log(err)

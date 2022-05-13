@@ -10,9 +10,15 @@ import { sendEmailAlert } from "./emailAlert";
 import { InMemoryRateLimiter } from "rolling-rate-limiter";
 
 // global rate limit
-const rollingLimiter = new InMemoryRateLimiter({
+const globalLimiter = new InMemoryRateLimiter({
   interval: 1 * 60 * 60 * 1000, // milliseconds
   maxInInterval: 10,
+});
+
+// per ip rate limit
+const ipLimiter = new InMemoryRateLimiter({
+  interval: 48 * 60 * 60 * 1000, // milliseconds
+  maxInInterval: 1,
 });
 
 const MIN_HANDLE_LENGTH = 1;
@@ -30,7 +36,7 @@ export type RegisterResult = {
   topUpSuccessful: boolean
 } & RegisterBlockData
 
-export async function register(joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
+export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
   await joy.init
 
   // Validate address
@@ -112,10 +118,18 @@ Members Working group has sufficient budget: ${workingGroupHasBudget}
     return callback('FaucetExhausted', 400)
   }
 
-  // apply limit for global api call
-  const wasBlocked = await rollingLimiter.limit('register')
-  if (wasBlocked) {
-      return callback("TooManyRequests", 429);
+  // apply limit per ip address
+  const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
+  if (wasBlockedIp) {
+    log(`${ip} was throttled`)
+    return callback("TooManyRequests", 429);
+  }
+
+  // apply global api call limit
+  const wasBlockedGlobal = await globalLimiter.limit('global-register')
+  if (wasBlockedGlobal) {
+    log('global throttled')
+    return callback("TooManyRequests", 429);
   }
 
   let memberId: MemberId | undefined
