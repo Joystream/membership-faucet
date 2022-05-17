@@ -17,7 +17,7 @@ const PER_IP_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.PER_IP_API_LIMIT_M
 
 const ENABLE_API_THROTTLING = (() => {
   const enable = process.env.ENABLE_API_THROTTLING || ''
-  return ['true', 'TRUE', 'yes', 'y', '1', 'on', 'ON'].indexOf(enable) != undefined
+  return ['true', 'TRUE', 'yes', 'y', '1', 'on', 'ON'].indexOf(enable) !== undefined
 })()
 
 // global rate limit
