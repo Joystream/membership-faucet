@@ -9,16 +9,27 @@ import { formatBalance } from "@polkadot/util";
 import { sendEmailAlert } from "./emailAlert";
 import { InMemoryRateLimiter } from "rolling-rate-limiter";
 
+const GLOBAL_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.GLOBAL_API_LIMIT_INTERVAL_HOURS || '') || 1
+const GLOBAL_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.GLOBAL_API_LIMIT_MAX_IN_INTERVAL || '') || 10
+
+const PER_IP_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.PER_IP_API_LIMIT_INTERVAL_HOURS || '') || 48
+const PER_IP_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.PER_IP_API_LIMIT_MAX_IN_INTERVAL || '') || 1
+
+const ENABLE_API_THROTTLING = (() => {
+  const enable = process.env.ENABLE_API_THROTTLING || ''
+  return ['true', 'TRUE', 'yes', 'y', '1', 'on', 'ON'].indexOf(enable) != undefined
+})()
+
 // global rate limit
 const globalLimiter = new InMemoryRateLimiter({
-  interval: 1 * 60 * 60 * 1000, // milliseconds
-  maxInInterval: 10,
+  interval: GLOBAL_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
+  maxInInterval: GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
 });
 
 // per ip rate limit
 const ipLimiter = new InMemoryRateLimiter({
-  interval: 48 * 60 * 60 * 1000, // milliseconds
-  maxInInterval: 1,
+  interval: PER_IP_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
+  maxInInterval: PER_IP_API_LIMIT_MAX_IN_INTERVAL,
 });
 
 const MIN_HANDLE_LENGTH = 1;
@@ -118,18 +129,20 @@ Members Working group has sufficient budget: ${workingGroupHasBudget}
     return callback('FaucetExhausted', 400)
   }
 
-  // apply limit per ip address
-  const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
-  if (wasBlockedIp) {
-    log(`${ip} was throttled`)
-    return callback("TooManyRequests", 429);
-  }
+  if (ENABLE_API_THROTTLING) {
+    // apply limit per ip address
+    const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
+    if (wasBlockedIp) {
+      log(`${ip} was throttled`)
+      return callback("TooManyRequests", 429);
+    }
 
-  // apply global api call limit
-  const wasBlockedGlobal = await globalLimiter.limit('global-register')
-  if (wasBlockedGlobal) {
-    log('global throttled')
-    return callback("TooManyRequests", 429);
+    // apply global api call limit
+    const wasBlockedGlobal = await globalLimiter.limit('global-register')
+    if (wasBlockedGlobal) {
+      log('global throttled')
+      return callback("TooManyRequests", 429);
+    }
   }
 
   let memberId: MemberId | undefined

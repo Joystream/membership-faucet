@@ -2,10 +2,13 @@ import sendgrid from '@sendgrid/mail'
 import { error, log } from './debug'
 import { InMemoryRateLimiter } from "rolling-rate-limiter";
 
+const EMAIL_ALERTS_LIMIT_INTERVAL_HOURS = parseInt(process.env.EMAIL_ALERTS_LIMIT_INTERVAL_HOURS || '') || 1
+const EMAIL_ALERTS_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.EMAIL_ALERTS_LIMIT_MAX_IN_INTERVAL || '') || 5
+
 // email rate limit
 const rollingLimiter = new InMemoryRateLimiter({
-  interval: 1 * 60 * 60 * 1000, // milliseconds
-  maxInInterval: 5,
+  interval: EMAIL_ALERTS_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
+  maxInInterval: EMAIL_ALERTS_LIMIT_MAX_IN_INTERVAL,
 });
 
 // Reference https://docs.sendgrid.com/for-developers/sending-email/quickstart-nodejs
