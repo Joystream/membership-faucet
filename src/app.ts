@@ -6,7 +6,6 @@ import { register } from './register'
 import { AnyJson } from "@polkadot/types/types";
 import bodyParser from 'body-parser';
 import locks from "locks";
-// import expressRateLimit from 'express-rate-limit';
 
 const app = express();
 const port = parseInt(process.env.PORT || '3002');
