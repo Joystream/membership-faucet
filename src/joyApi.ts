@@ -14,7 +14,7 @@ import { error } from "./debug";
 // Init .env config
 config();
 
-export const BALANCE_TOP_UP_AMOUNT = 10;
+export const BALANCE_TOP_UP_AMOUNT = parseInt(process.env.BALANCE_TOP_UP_AMOUNT || '')
 
 export class ErrorWithData extends Error {
   code: number = 400;
@@ -201,6 +201,21 @@ export class JoyApi {
       }
       const unsubscribe = await tx.signAndSend(signingPair, callback)
     })
+  }
+
+  async invitingMemberHasInvites(): Promise<boolean> {
+    const member = await this.api.query.members.membershipById(process.env.INVITING_MEMBER_ID ?? 0)
+    return member.invites.toNumber() > 0
+  }
+
+  async invitingMemberHasTopUpBalance(): Promise<boolean> {
+    const balance = await this.api.derive.balances.all(this.signingPair!.address)
+    return balance.freeBalance.toNumber() > BALANCE_TOP_UP_AMOUNT
+  }
+
+  async workingGroupHasBudget(): Promise<boolean> {
+    const budget = await this.api.query.membershipWorkingGroup.budget()
+    return budget.gte(this.api.consts.members.defaultInitialInvitationBalance)
   }
 }
 

@@ -1,5 +1,15 @@
 import sendgrid from '@sendgrid/mail'
 import { error, log } from './debug'
+import { InMemoryRateLimiter } from "rolling-rate-limiter";
+
+const EMAIL_ALERTS_LIMIT_INTERVAL_HOURS = parseInt(process.env.EMAIL_ALERTS_LIMIT_INTERVAL_HOURS || '') || 1
+const EMAIL_ALERTS_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.EMAIL_ALERTS_LIMIT_MAX_IN_INTERVAL || '') || 5
+
+// email rate limit
+const rollingLimiter = new InMemoryRateLimiter({
+  interval: EMAIL_ALERTS_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
+  maxInInterval: EMAIL_ALERTS_LIMIT_MAX_IN_INTERVAL,
+});
 
 // Reference https://docs.sendgrid.com/for-developers/sending-email/quickstart-nodejs
 
@@ -15,10 +25,15 @@ const ALERT_TO_EMAIL = process.env.ALERT_TO_EMAIL
 
 sendgrid.setApiKey(SENDGRID_API_KEY || '')
 
-export const sendEmailAlert = (message: string) => {
+export const sendEmailAlert = async (message: string) => {
     if (!(SENDGRID_API_KEY && ALERT_FROM_EMAIL && ALERT_TO_EMAIL)) {
-        log('Email Alerts not configured, not sending email alert.')
+        log('Email alert not sent - not configured')
         return
+    }
+
+    const wasBlocked = await rollingLimiter.limit('email')
+    if (wasBlocked) {
+        return log('Email alert not sent - throttling');
     }
 
     const emails = ALERT_TO_EMAIL.split(',')
@@ -37,9 +52,9 @@ export const sendEmailAlert = (message: string) => {
 
     sendgrid.send(messages, isMultiple)
         .then(() => {
-            log('Sent Email Alert!')
+            log('Sent email alert.')
         })
         .catch((err: any) => {
-            error('Failed Sending Email Alert', err)
+            error('Failed sending email alert:', err)
         })
 }

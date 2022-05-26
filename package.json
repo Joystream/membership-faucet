@@ -27,7 +27,8 @@
     "locks": "^0.2.2",
     "lowdb": "^1.0.0",
     "moment": "^2.29.3",
-    "pm2": "^5.1.2"
+    "pm2": "^5.1.2",
+    "rolling-rate-limiter": "^0.2.13"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",

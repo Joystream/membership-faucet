@@ -7,6 +7,30 @@ import { Hash, MemberId} from "@joystream/types/common";
 import { getDataFromEvent } from "./utils";
 import { formatBalance } from "@polkadot/util";
 import { sendEmailAlert } from "./emailAlert";
+import { InMemoryRateLimiter } from "rolling-rate-limiter";
+
+const GLOBAL_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.GLOBAL_API_LIMIT_INTERVAL_HOURS || '') || 1
+const GLOBAL_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.GLOBAL_API_LIMIT_MAX_IN_INTERVAL || '') || 10
+
+const PER_IP_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.PER_IP_API_LIMIT_INTERVAL_HOURS || '') || 48
+const PER_IP_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.PER_IP_API_LIMIT_MAX_IN_INTERVAL || '') || 1
+
+const ENABLE_API_THROTTLING = (() => {
+  const enable = process.env.ENABLE_API_THROTTLING || ''
+  return ['true', 'TRUE', 'yes', 'y', '1', 'on', 'ON'].indexOf(enable) !== -1
+})()
+
+// global rate limit
+const globalLimiter = new InMemoryRateLimiter({
+  interval: GLOBAL_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
+  maxInInterval: GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
+});
+
+// per ip rate limit
+const ipLimiter = new InMemoryRateLimiter({
+  interval: PER_IP_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
+  maxInInterval: PER_IP_API_LIMIT_MAX_IN_INTERVAL,
+});
 
 const MIN_HANDLE_LENGTH = 1;
 const MAX_HANDLE_LENGTH = 100;
@@ -23,7 +47,7 @@ export type RegisterResult = {
   topUpSuccessful: boolean
 } & RegisterBlockData
 
-export async function register(joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
+export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
   await joy.init
 
   // Validate address
@@ -82,9 +106,48 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
     }
   }
 
+  // Check inviting members has invites
+  const hasInvites = await joy.invitingMemberHasInvites()
+  // Check inviting member has balance to top up new member account
+  const hasBalance = await joy.invitingMemberHasTopUpBalance()
+  // Check membership working group has budget
+  const workingGroupHasBudget = await joy.workingGroupHasBudget()
+
+  const canInviteMember = hasInvites && hasBalance && workingGroupHasBudget
+
+  if(!canInviteMember) {
+    // log faucet exhausted
+    log('Faucet exhausted')
+
+    // send email alert faucet is exhausted
+    sendEmailAlert(`Faucet is exhausted
+Inviting member has enough invites: ${hasInvites}
+Inviting member has enough topup balance: ${hasBalance}
+Members Working group has sufficient budget: ${workingGroupHasBudget}
+    `)
+
+    return callback('FaucetExhausted', 400)
+  }
+
+  if (ENABLE_API_THROTTLING) {
+    // apply limit per ip address
+    const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
+    if (wasBlockedIp) {
+      log(`${ip} was throttled`)
+      return callback("TooManyRequests", 429);
+    }
+
+    // apply global api call limit
+    const wasBlockedGlobal = await globalLimiter.limit('global-register')
+    if (wasBlockedGlobal) {
+      log('global throttled')
+      return callback("TooManyRequests", 429);
+    }
+  }
+
   let memberId: MemberId | undefined
   let registeredAtBlock: RegisterBlockData
-  let topUpSuccessful: boolean
+  let topUpSuccessful: boolean = false
 
   try {
     const result = await joy.addScreenedMember({account, handle, name, avatar, about})
@@ -106,14 +169,16 @@ export async function register(joy: JoyApi, account: string, handle: string, nam
     return
   }
 
-  try {
-    await joy.topUpBalance(account)
-    log('Balance of account :', account, 'topped up with:', formatBalance(BALANCE_TOP_UP_AMOUNT))
-    topUpSuccessful = true
-  } catch (err) {
-    topUpSuccessful = false
-    error('Failed to top up balance of account:', account, 'Error:', err)
-    sendEmailAlert(`Failed to top up balance for new account ${account}. ${err}`)
+  if (BALANCE_TOP_UP_AMOUNT) {
+    try {
+      await joy.topUpBalance(account)
+      log('Balance of account :', account, 'topped up with:', formatBalance(BALANCE_TOP_UP_AMOUNT))
+      topUpSuccessful = true
+    } catch (err) {
+      topUpSuccessful = false
+      error('Failed to top up balance of account:', account, 'Error:', err)
+      sendEmailAlert(`Failed to top up balance for new account ${account}. ${err}`)
+    }
   }
 
   let result: RegisterResult = { memberId, ...registeredAtBlock, topUpSuccessful };
