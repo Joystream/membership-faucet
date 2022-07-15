@@ -10,6 +10,7 @@ import { MembershipMetadata } from "@joystream/metadata-protobuf";
 import { SubmittableExtrinsic } from "@polkadot/api/types";
 import { DispatchError } from "@polkadot/types/interfaces/system";
 import { error } from "./debug";
+import IExternalResource = MembershipMetadata.IExternalResource;
 
 // Init .env config
 config();
@@ -43,6 +44,7 @@ interface NewMember {
   avatar?: string
   about?: string
   name?: string
+  externalResources?: IExternalResource[]
 }
 
 export class JoyApi {
@@ -129,7 +131,7 @@ export class JoyApi {
 
   async addScreenedMember(memberData: NewMember) {
     const invitingMemberId = process.env.INVITING_MEMBER_ID ?? '0'
-    const {account, handle, about, name, avatar} = memberData
+    const {account, handle, about, name, avatar, externalResources} = memberData
 
     return this.sendAndProcessTx(this.api.tx.members.inviteMember({
       inviting_member_id: invitingMemberId,
@@ -140,6 +142,7 @@ export class JoyApi {
           about: about ?? null,
           name: name ?? null,
           avatarUri: avatar,
+          externalResources
         }).finish()).toString('hex')),
     }))
   }
@@ -160,9 +163,9 @@ export class JoyApi {
         if (!result.isCompleted) {
           return
         }
-  
+
         unsubscribe()
-  
+
         if (result.isError) {
           error('Transaction failed:', result)
           const { isDropped, isFinalityTimeout, isInvalid, isUsurped } = result.status
@@ -175,10 +178,10 @@ export class JoyApi {
             }
           }))
         }
-  
+
         const success = result.findRecord('system', 'ExtrinsicSuccess')
         const failed = result.findRecord('system', 'ExtrinsicFailed')
-  
+
         if (success) {
           resolve(result)
         } else if (failed) {
