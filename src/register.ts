@@ -8,6 +8,8 @@ import { getDataFromEvent } from "./utils";
 import { formatBalance } from "@polkadot/util";
 import { sendEmailAlert } from "./emailAlert";
 import { InMemoryRateLimiter } from "rolling-rate-limiter";
+import {MembershipMetadata} from "@joystream/metadata-protobuf";
+import IExternalResource = MembershipMetadata.IExternalResource;
 
 const GLOBAL_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.GLOBAL_API_LIMIT_INTERVAL_HOURS || '') || 1
 const GLOBAL_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.GLOBAL_API_LIMIT_MAX_IN_INTERVAL || '') || 10
@@ -47,7 +49,7 @@ export type RegisterResult = {
   topUpSuccessful: boolean
 } & RegisterBlockData
 
-export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
+export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, externalResources: IExternalResource[], callback: RegisterCallback) {
   await joy.init
 
   // Validate address
@@ -150,7 +152,7 @@ Members Working group has sufficient budget: ${workingGroupHasBudget}
   let topUpSuccessful: boolean = false
 
   try {
-    const result = await joy.addScreenedMember({account, handle, name, avatar, about})
+    const result = await joy.addScreenedMember({account, handle, name, avatar, about, externalResources})
     memberId = memberIdFromEvent(result.events)
     log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
 
