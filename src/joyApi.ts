@@ -210,7 +210,7 @@ export class JoyApi {
 
   async invitingMemberHasTopUpBalance(): Promise<boolean> {
     const balance = await this.api.derive.balances.all(this.signingPair!.address)
-    return balance.freeBalance.toNumber() > BALANCE_TOP_UP_AMOUNT
+    return balance.freeBalance.gtn(BALANCE_TOP_UP_AMOUNT)
   }
 
   async workingGroupHasBudget(): Promise<boolean> {
