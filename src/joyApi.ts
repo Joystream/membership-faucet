@@ -1,7 +1,7 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { createType, types } from "@joystream/types";
-import { Hash } from "@joystream/types/common";
+import { createType, JOYSTREAM_ADDRESS_PREFIX } from '@joystream/types'
 import { Callback, ISubmittableResult } from "@polkadot/types/types";
+import type { Hash } from '@polkadot/types/interfaces/runtime';
 import { Keyring } from "@polkadot/keyring";
 import { config } from "dotenv";
 import { blake2AsHex } from "@polkadot/util-crypto";
@@ -53,12 +53,12 @@ export class JoyApi {
   signingPair?: KeyringPair;
 
   constructor(endpoint?: string) {
-    this.keyring = new Keyring()
+    this.keyring = new Keyring({ type: 'sr25519', ss58Format: JOYSTREAM_ADDRESS_PREFIX })
     const wsEndpoint =
       endpoint || process.env.PROVIDER || "ws://127.0.0.1:9944";
     this.endpoint = wsEndpoint;
     this.isReady = (async () => {
-      const api = await new ApiPromise({ provider: new WsProvider(wsEndpoint), types })
+      const api = await new ApiPromise({ provider: new WsProvider(wsEndpoint) })
         .isReady;
       return api;
     })();
@@ -132,9 +132,9 @@ export class JoyApi {
     const {account, handle, about, name, avatar} = memberData
 
     return this.sendAndProcessTx(this.api.tx.members.inviteMember({
-      inviting_member_id: invitingMemberId,
-      root_account: account,
-      controller_account: account,
+      invitingMemberId: invitingMemberId,
+      rootAccount: account,
+      controllerAccount: account,
       handle: handle,
         metadata: createType('Bytes', '0x' + Buffer.from(MembershipMetadata.encode({
           about: about ?? null,
@@ -205,12 +205,12 @@ export class JoyApi {
 
   async invitingMemberHasInvites(): Promise<boolean> {
     const member = await this.api.query.members.membershipById(process.env.INVITING_MEMBER_ID ?? 0)
-    return member.invites.toNumber() > 0
+    return member.isSome ? member.unwrap().invites.toNumber() > 0 : false
   }
 
   async invitingMemberHasTopUpBalance(): Promise<boolean> {
     const balance = await this.api.derive.balances.all(this.signingPair!.address)
-    return balance.freeBalance.toNumber() > BALANCE_TOP_UP_AMOUNT
+    return balance.freeBalance.gtn(BALANCE_TOP_UP_AMOUNT)
   }
 
   async workingGroupHasBudget(): Promise<boolean> {
