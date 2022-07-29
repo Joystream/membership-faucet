@@ -14,7 +14,8 @@ import { error } from "./debug";
 // Init .env config
 config();
 
-export const BALANCE_TOP_UP_AMOUNT = parseInt(process.env.BALANCE_TOP_UP_AMOUNT || '')
+export const BALANCE_CREDIT = parseInt(process.env.BALANCE_CREDIT || '')
+export const BALANCE_LOCKED = parseInt(process.env.BALANCE_LOCKED || '')
 
 export class ErrorWithData extends Error {
   code: number = 400;
@@ -66,7 +67,7 @@ export class JoyApi {
   get init(): Promise<JoyApi> {
     return this.isReady.then((instance) => {
       this.api = instance;
-      const screeningAuthoritySeed = process.env.SCREENING_AUTHORITY_SEED || '//Alice'
+      const screeningAuthoritySeed = process.env.INVITER_KEY || '//Alice'
       // Fails unless we do this after api is ready
       this.signingPair = this.keyring.addFromUri(screeningAuthoritySeed, undefined, 'sr25519');
       return this;
@@ -127,12 +128,9 @@ export class JoyApi {
     return blockHeader.number.toNumber()
   }
 
-  async addScreenedMember(memberData: NewMember) {
-    const invitingMemberId = process.env.INVITING_MEMBER_ID ?? '0'
+  makeGiftMembershipTx(memberData: NewMember) {
     const {account, handle, about, name, avatar} = memberData
-
-    return this.sendAndProcessTx(this.api.tx.members.inviteMember({
-      invitingMemberId: invitingMemberId,
+    return this.api.tx.members.giftMembership({
       rootAccount: account,
       controllerAccount: account,
       handle: handle,
@@ -141,18 +139,16 @@ export class JoyApi {
           name: name ?? null,
           avatarUri: avatar,
         }).finish()).toString('hex')),
-    }))
-  }
-
-  async topUpBalance(address: string) {
-    return this.sendAndProcessTx(this.api.tx.balances.transferKeepAlive(address, BALANCE_TOP_UP_AMOUNT))
+        creditRootAccount: BALANCE_CREDIT,
+        applyRootAccountInvitationLock: BALANCE_LOCKED ?? null,
+    })
   }
 
   async sendAndProcessTx(tx: SubmittableExtrinsic<'promise'>): Promise<ISubmittableResult> {
     const signingPair = this.signingPair
 
     if(!signingPair) {
-      throw new Error('Inviting Member Key Not Found In Keyring')
+      throw new Error('Inviting Key Not Found In Keyring')
     }
 
     return new Promise(async (resolve, reject) => {
@@ -203,19 +199,13 @@ export class JoyApi {
     })
   }
 
-  async invitingMemberHasInvites(): Promise<boolean> {
-    const member = await this.api.query.members.membershipById(process.env.INVITING_MEMBER_ID ?? 0)
-    return member.isSome ? member.unwrap().invites.toNumber() > 0 : false
-  }
-
-  async invitingMemberHasTopUpBalance(): Promise<boolean> {
+  async invitingAccountHasFundsToGift(tx: SubmittableExtrinsic<'promise'>): Promise<boolean> {
     const balance = await this.api.derive.balances.all(this.signingPair!.address)
-    return balance.freeBalance.gtn(BALANCE_TOP_UP_AMOUNT)
-  }
-
-  async workingGroupHasBudget(): Promise<boolean> {
-    const budget = await this.api.query.membershipWorkingGroup.budget()
-    return budget.gte(this.api.consts.members.defaultInitialInvitationBalance)
+    const membershipFee = await this.api.query.members.membershipPrice()
+    const credit = BALANCE_CREDIT
+    const txFees = (await tx.paymentInfo(this.signingPair!.address)).partialFee
+    const requiredFunds = membershipFee.add(txFees).addn(credit)
+    return balance.availableBalance.gt(requiredFunds)
   }
 }
 
