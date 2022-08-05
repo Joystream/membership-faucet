@@ -8,6 +8,8 @@ import type { Hash } from '@polkadot/types/interfaces/runtime';
 import { getDataFromEvent } from "./utils";
 import { sendEmailAlert } from "./emailAlert";
 import { InMemoryRateLimiter } from "rolling-rate-limiter";
+import {MembershipMetadata} from "@joystream/metadata-protobuf";
+import IExternalResource = MembershipMetadata.IExternalResource;
 
 const GLOBAL_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.GLOBAL_API_LIMIT_INTERVAL_HOURS || '') || 1
 const GLOBAL_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.GLOBAL_API_LIMIT_MAX_IN_INTERVAL || '') || 10
@@ -46,7 +48,7 @@ export type RegisterResult = {
   memberId?: MemberId,
 } & RegisterBlockData
 
-export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
+export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, externalResources: IExternalResource[], callback: RegisterCallback) {
   await joy.init
 
   // Validate address
@@ -105,7 +107,7 @@ export async function register(ip: string, joy: JoyApi, account: string, handle:
     }
   }
 
-  const giftMembershipTx = joy.makeGiftMembershipTx({ account, handle, avatar, name, about })
+  const giftMembershipTx = joy.makeGiftMembershipTx({ account, handle, avatar, name, about, externalResources })
 
   // Check inviting key has balance to gift new member
   const canInviteMember = await joy.invitingAccountHasFundsToGift(giftMembershipTx)

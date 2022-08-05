@@ -62,11 +62,11 @@ app.post("/register", async (req, res) => {
     res.status(statusCode).send(result);
   }
 
-  const { account, handle, avatar, about, name } = req.body
+  const { account, handle, avatar, about, name, externalResources } = req.body
 
   processingRequest.lock(async () => {
     try {
-      await register(req.ip, joy, account, handle, name, avatar, about, callback);
+      await register(req.ip, joy, account, handle, name, avatar, about, externalResources, callback);
     } catch (err) {
       processingRequest.unlock();
       log(err)
