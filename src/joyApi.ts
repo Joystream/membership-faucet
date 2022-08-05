@@ -205,9 +205,9 @@ export class JoyApi {
   async invitingAccountHasFundsToGift(tx: SubmittableExtrinsic<'promise'>): Promise<boolean> {
     const balance = await this.api.derive.balances.all(this.signingPair!.address)
     const membershipFee = await this.api.query.members.membershipPrice()
-    const credit = BALANCE_CREDIT
+    const credit = createType('u128', BALANCE_CREDIT)
     const txFees = (await tx.paymentInfo(this.signingPair!.address)).partialFee
-    const requiredFunds = membershipFee.add(txFees).addn(credit)
+    const requiredFunds = membershipFee.add(txFees).add(credit)
     return balance.availableBalance.gt(requiredFunds)
   }
 }
