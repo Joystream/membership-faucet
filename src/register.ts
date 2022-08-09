@@ -1,4 +1,4 @@
-import { BALANCE_TOP_UP_AMOUNT, ErrorWithData, JoyApi } from "./joyApi";
+import { ErrorWithData, JoyApi } from "./joyApi";
 import { EventRecord } from "@polkadot/types/interfaces";
 import { decodeAddress } from "@polkadot/keyring";
 import { log, error } from "./debug";
@@ -6,9 +6,10 @@ import BN from "bn.js";
 import { MemberId } from "@joystream/types/primitives";
 import type { Hash } from '@polkadot/types/interfaces/runtime';
 import { getDataFromEvent } from "./utils";
-import { formatBalance } from "@polkadot/util";
 import { sendEmailAlert } from "./emailAlert";
 import { InMemoryRateLimiter } from "rolling-rate-limiter";
+import {MembershipMetadata} from "@joystream/metadata-protobuf";
+import IExternalResource = MembershipMetadata.IExternalResource;
 
 const GLOBAL_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.GLOBAL_API_LIMIT_INTERVAL_HOURS || '') || 1
 const GLOBAL_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.GLOBAL_API_LIMIT_MAX_IN_INTERVAL || '') || 10
@@ -37,7 +38,7 @@ const MIN_HANDLE_LENGTH = 1;
 const MAX_HANDLE_LENGTH = 100;
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
-  return getDataFromEvent(events, 'members', 'MemberInvited', 0)
+  return getDataFromEvent(events, 'members', 'MembershipGifted', 0)
 }
 
 export type RegisterCallback = (result: any, statusCode: number) => void
@@ -45,10 +46,9 @@ export type RegisterCallback = (result: any, statusCode: number) => void
 export type RegisterBlockData = { block: null } | { block: number, blockHash: Hash }
 export type RegisterResult = {
   memberId?: MemberId,
-  topUpSuccessful: boolean
 } & RegisterBlockData
 
-export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, callback: RegisterCallback) {
+export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, externalResources: IExternalResource[], callback: RegisterCallback) {
   await joy.init
 
   // Validate address
@@ -107,25 +107,17 @@ export async function register(ip: string, joy: JoyApi, account: string, handle:
     }
   }
 
-  // Check inviting members has invites
-  const hasInvites = await joy.invitingMemberHasInvites()
-  // Check inviting member has balance to top up new member account
-  const hasBalance = await joy.invitingMemberHasTopUpBalance()
-  // Check membership working group has budget
-  const workingGroupHasBudget = await joy.workingGroupHasBudget()
+  const giftMembershipTx = joy.makeGiftMembershipTx({ account, handle, avatar, name, about, externalResources })
 
-  const canInviteMember = hasInvites && hasBalance && workingGroupHasBudget
+  // Check inviting key has balance to gift new member
+  const canInviteMember = await joy.invitingAccountHasFundsToGift(giftMembershipTx)
 
   if(!canInviteMember) {
     // log faucet exhausted
     log('Faucet exhausted')
 
     // send email alert faucet is exhausted
-    sendEmailAlert(`Faucet is exhausted
-Inviting member has enough invites: ${hasInvites}
-Inviting member has enough topup balance: ${hasBalance}
-Members Working group has sufficient budget: ${workingGroupHasBudget}
-    `)
+    sendEmailAlert("Faucet is exhausted")
 
     return callback('FaucetExhausted', 400)
   }
@@ -148,10 +140,9 @@ Members Working group has sufficient budget: ${workingGroupHasBudget}
 
   let memberId: MemberId | undefined
   let registeredAtBlock: RegisterBlockData
-  let topUpSuccessful: boolean = false
 
   try {
-    const result = await joy.addScreenedMember({account, handle, name, avatar, about})
+    const result = await joy.sendAndProcessTx(giftMembershipTx)
     memberId = memberIdFromEvent(result.events)
     log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
 
@@ -170,19 +161,7 @@ Members Working group has sufficient budget: ${workingGroupHasBudget}
     return
   }
 
-  if (BALANCE_TOP_UP_AMOUNT) {
-    try {
-      await joy.topUpBalance(account)
-      log('Balance of account :', account, 'topped up with:', formatBalance(BALANCE_TOP_UP_AMOUNT))
-      topUpSuccessful = true
-    } catch (err) {
-      topUpSuccessful = false
-      error('Failed to top up balance of account:', account, 'Error:', err)
-      sendEmailAlert(`Failed to top up balance for new account ${account}. ${err}`)
-    }
-  }
-
-  let result: RegisterResult = { memberId, ...registeredAtBlock, topUpSuccessful };
+  let result: RegisterResult = { memberId, ...registeredAtBlock };
   callback(result, 200)
 }
 
