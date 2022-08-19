@@ -11,6 +11,8 @@ import { InMemoryRateLimiter } from "rolling-rate-limiter";
 import {MembershipMetadata} from "@joystream/metadata-protobuf";
 import IExternalResource = MembershipMetadata.IExternalResource;
 
+
+
 const GLOBAL_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.GLOBAL_API_LIMIT_INTERVAL_HOURS || '') || 1
 const GLOBAL_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.GLOBAL_API_LIMIT_MAX_IN_INTERVAL || '') || 10
 
@@ -48,7 +50,37 @@ export type RegisterResult = {
   memberId?: MemberId,
 } & RegisterBlockData
 
-export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, externalResources: IExternalResource[], callback: RegisterCallback) {
+export interface CaptchaResponse {
+  success: boolean,         // is the passcode valid, and does it meet security criteria you specified, e.g. sitekey?
+  challenge_ts: string,     // timestamp of the challenge (ISO format yyyy-MM-dd'T'HH:mm:ssZZ)
+  hostname: string,         // the hostname of the site where the challenge was solved
+  credit?: boolean,         // optional: whether the response will be credited
+  'error-codes'?: string[]  // optional: any error codes
+  // score: number,         // ENTERPRISE feature: a score denoting malicious activity.
+  // score_reason: [...]    // ENTERPRISE feature: reason(s) for score.
+}
+
+export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, externalResources: IExternalResource[], captchaToken: string, callback: RegisterCallback) {
+  try {
+    const response = await fetch('https://hcaptcha.com/siteverify', {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: `response=${captchaToken}&secret=${process.env.CAPTCHA_SITE_KEY}`
+    }).then(res => res.json()) as CaptchaResponse
+
+    if(!response.success) {
+      callback({
+        error: 'InvalidCaptchaToken'
+      }, 400)
+      return
+    }
+  } catch (err) {
+    log('failed on hcaptcha server request')
+    callback({
+      error: 'CaptchaServerError'
+    }, 500)
+  }
+
   await joy.init
 
   // Validate address
