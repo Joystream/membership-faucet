@@ -6,7 +6,7 @@ import { register } from './register'
 import { AnyJson } from '@polkadot/types/types'
 import bodyParser from 'body-parser'
 import locks from 'locks'
-import { PORT } from './config'
+import { HCAPTCHA_ENABLED, PORT } from './config'
 
 const app = express()
 const joy = new JoyApi()
@@ -62,7 +62,15 @@ app.post('/register', async (req, res) => {
     res.status(statusCode).send(result)
   }
 
-  const { account, handle, avatar, about, name, externalResources } = req.body
+  const {
+    account,
+    handle,
+    avatar,
+    about,
+    name,
+    externalResources,
+    captchaToken,
+  } = req.body
 
   processingRequest.lock(async () => {
     try {
@@ -75,6 +83,7 @@ app.post('/register', async (req, res) => {
         avatar,
         about,
         externalResources,
+        captchaToken,
         callback
       )
     } catch (err) {
@@ -87,4 +96,5 @@ app.post('/register', async (req, res) => {
 
 app.listen(PORT, () => {
   log(`server started at http://localhost:${PORT}`)
+  log(`captcha ${HCAPTCHA_ENABLED ? 'enabled' : 'disabled'}`)
 })

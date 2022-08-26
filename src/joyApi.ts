@@ -3,7 +3,6 @@ import { createType, JOYSTREAM_ADDRESS_PREFIX } from '@joystream/types'
 import { Callback, ISubmittableResult } from '@polkadot/types/types'
 import type { Hash } from '@polkadot/types/interfaces/runtime'
 import { Keyring } from '@polkadot/keyring'
-import { config } from 'dotenv'
 import { blake2AsHex } from '@polkadot/util-crypto'
 import { KeyringPair } from '@polkadot/keyring/types'
 import { MembershipMetadata } from '@joystream/metadata-protobuf'
@@ -17,9 +16,6 @@ import {
   SCREENING_AUTHORITY_SEED,
   WS_PROVIDER,
 } from './config'
-
-// Init .env config
-config()
 
 export class ErrorWithData extends Error {
   code: number = 400

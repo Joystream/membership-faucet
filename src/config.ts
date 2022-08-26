@@ -1,3 +1,8 @@
+import { config } from 'dotenv'
+
+// Init .env config
+config()
+
 function readEnvInt<T>(key: string, defaultValue: T): number | T {
   const value = process.env[key]
   if (value) {
@@ -58,3 +63,7 @@ export const ALERT_FROM_EMAIL = process.env.ALERT_FROM_EMAIL || ''
 // For multiple emails messages use a comma separated list. It is preferable
 // to use a single address of a distribution list to send alerts to multiple users if possible.
 export const ALERT_TO_EMAIL = process.env.ALERT_TO_EMAIL
+
+export const HCAPTCHA_ENDPOINT = 'https://hcaptcha.com/siteverify'
+export const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET
+export const HCAPTCHA_ENABLED = HCAPTCHA_ENDPOINT && HCAPTCHA_SECRET

@@ -14,11 +14,13 @@ import {
   ENABLE_API_THROTTLING,
   GLOBAL_API_LIMIT_INTERVAL_HOURS,
   GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
+  HCAPTCHA_ENABLED,
   MAX_HANDLE_LENGTH,
   MIN_HANDLE_LENGTH,
   PER_IP_API_LIMIT_INTERVAL_HOURS,
   PER_IP_API_LIMIT_MAX_IN_INTERVAL,
 } from './config'
+import { verifyCaptcha } from './captcha'
 
 // global rate limit
 const globalLimiter = new InMemoryRateLimiter({
@@ -42,7 +44,7 @@ export type RegisterBlockData =
   | { block: null }
   | { block: number; blockHash: Hash }
 export type RegisterResult = {
-  memberId?: MemberId
+  memberId?: number
 } & RegisterBlockData
 
 export async function register(
@@ -54,8 +56,34 @@ export async function register(
   avatar: string | undefined,
   about: string,
   externalResources: IExternalResource[],
+  captchaToken: string,
   callback: RegisterCallback
 ) {
+  // verify captcha if enabled
+  if (HCAPTCHA_ENABLED) {
+    if (!captchaToken) {
+      callback(
+        {
+          error: 'MissingCaptchaToken',
+        },
+        400
+      )
+      return
+    }
+    const captchaResult = await verifyCaptcha(captchaToken)
+    if (captchaResult !== true) {
+      log('captcha verification failed')
+      callback(
+        {
+          error: 'InvalidCaptchaToken',
+          errorCodes: captchaResult,
+        },
+        400
+      )
+      return
+    }
+  }
+
   await joy.init
 
   // Validate address
@@ -195,6 +223,9 @@ export async function register(
     return
   }
 
-  let result: RegisterResult = { memberId, ...registeredAtBlock }
+  let result: RegisterResult = {
+    memberId: memberId?.toNumber(),
+    ...registeredAtBlock,
+  }
   callback(result, 200)
 }
