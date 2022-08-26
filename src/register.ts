@@ -1,15 +1,15 @@
-import { ErrorWithData, JoyApi } from "./joyApi";
-import { EventRecord } from "@polkadot/types/interfaces";
-import { decodeAddress } from "@polkadot/keyring";
-import { log, error } from "./debug";
-import BN from "bn.js";
-import { MemberId } from "@joystream/types/primitives";
-import type { Hash } from '@polkadot/types/interfaces/runtime';
-import { getDataFromEvent } from "./utils";
-import { sendEmailAlert } from "./emailAlert";
-import { InMemoryRateLimiter } from "rolling-rate-limiter";
-import {MembershipMetadata} from "@joystream/metadata-protobuf";
-import IExternalResource = MembershipMetadata.IExternalResource;
+import { ErrorWithData, JoyApi } from './joyApi'
+import { EventRecord } from '@polkadot/types/interfaces'
+import { decodeAddress } from '@polkadot/keyring'
+import { log, error } from './debug'
+import BN from 'bn.js'
+import { MemberId } from '@joystream/types/primitives'
+import type { Hash } from '@polkadot/types/interfaces/runtime'
+import { getDataFromEvent } from './utils'
+import { sendEmailAlert } from './emailAlert'
+import { InMemoryRateLimiter } from 'rolling-rate-limiter'
+import { MembershipMetadata } from '@joystream/metadata-protobuf'
+import IExternalResource = MembershipMetadata.IExternalResource
 import {
   ENABLE_API_THROTTLING,
   GLOBAL_API_LIMIT_INTERVAL_HOURS,
@@ -17,20 +17,20 @@ import {
   MAX_HANDLE_LENGTH,
   MIN_HANDLE_LENGTH,
   PER_IP_API_LIMIT_INTERVAL_HOURS,
-  PER_IP_API_LIMIT_MAX_IN_INTERVAL
-} from "./config";
+  PER_IP_API_LIMIT_MAX_IN_INTERVAL,
+} from './config'
 
 // global rate limit
 const globalLimiter = new InMemoryRateLimiter({
   interval: GLOBAL_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
   maxInInterval: GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
-});
+})
 
 // per ip rate limit
 const ipLimiter = new InMemoryRateLimiter({
   interval: PER_IP_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
   maxInInterval: PER_IP_API_LIMIT_MAX_IN_INTERVAL,
-});
+})
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
   return getDataFromEvent(events, 'members', 'MembershipGifted', 0)
@@ -38,12 +38,24 @@ function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
 
 export type RegisterCallback = (result: any, statusCode: number) => void
 
-export type RegisterBlockData = { block: null } | { block: number, blockHash: Hash }
+export type RegisterBlockData =
+  | { block: null }
+  | { block: number; blockHash: Hash }
 export type RegisterResult = {
-  memberId?: MemberId,
+  memberId?: MemberId
 } & RegisterBlockData
 
-export async function register(ip: string, joy: JoyApi, account: string, handle: string, name: string | undefined, avatar: string | undefined, about: string, externalResources: IExternalResource[], callback: RegisterCallback) {
+export async function register(
+  ip: string,
+  joy: JoyApi,
+  account: string,
+  handle: string,
+  name: string | undefined,
+  avatar: string | undefined,
+  about: string,
+  externalResources: IExternalResource[],
+  callback: RegisterCallback
+) {
   await joy.init
 
   // Validate address
@@ -51,43 +63,58 @@ export async function register(ip: string, joy: JoyApi, account: string, handle:
     decodeAddress(account)
   } catch (err) {
     log('invalid address supplied')
-    callback({
-      error: 'InvalidAddress',
-    }, 400)
+    callback(
+      {
+        error: 'InvalidAddress',
+      },
+      400
+    )
     return
   }
 
   // Ensure nonce = 0 and balance = 0 for account
   if (!(await joy.isFreshAccount(account))) {
-    callback({
-      error: 'OnlyNewAccountsCanBeUsedForScreenedMembers'
-    }, 400)
+    callback(
+      {
+        error: 'OnlyNewAccountsCanBeUsedForScreenedMembers',
+      },
+      400
+    )
     return
   }
 
   const minHandleLength = new BN(MIN_HANDLE_LENGTH)
   const maxHandleLength = new BN(MAX_HANDLE_LENGTH)
 
-  if(maxHandleLength.ltn(handle.length)) {
-    callback({
-      error: 'HandleTooLong'
-    }, 400)
+  if (maxHandleLength.ltn(handle.length)) {
+    callback(
+      {
+        error: 'HandleTooLong',
+      },
+      400
+    )
     return
   }
 
-  if(minHandleLength.gtn(handle.length)) {
-    callback({
-      error: 'HandleTooShort'
-    }, 400)
+  if (minHandleLength.gtn(handle.length)) {
+    callback(
+      {
+        error: 'HandleTooShort',
+      },
+      400
+    )
     return
   }
 
   // Ensure handle is unique
   if (await joy.handleIsAlreadyRegistered(handle)) {
     log('handle already registered')
-    callback({
-      error: 'HandleAlreadyRegistered',
-    }, 400)
+    callback(
+      {
+        error: 'HandleAlreadyRegistered',
+      },
+      400
+    )
     return
   }
 
@@ -96,23 +123,35 @@ export async function register(ip: string, joy: JoyApi, account: string, handle:
     if (err instanceof ErrorWithData) {
       callback(err.data, err.code)
     } else {
-      callback({
-        error: 'InternalServerError'
-      }, 500)
+      callback(
+        {
+          error: 'InternalServerError',
+        },
+        500
+      )
     }
   }
 
-  const giftMembershipTx = joy.makeGiftMembershipTx({ account, handle, avatar, name, about, externalResources })
+  const giftMembershipTx = joy.makeGiftMembershipTx({
+    account,
+    handle,
+    avatar,
+    name,
+    about,
+    externalResources,
+  })
 
   // Check inviting key has balance to gift new member
-  const canInviteMember = await joy.invitingAccountHasFundsToGift(giftMembershipTx)
+  const canInviteMember = await joy.invitingAccountHasFundsToGift(
+    giftMembershipTx
+  )
 
-  if(!canInviteMember) {
+  if (!canInviteMember) {
     // log faucet exhausted
     log('Faucet exhausted')
 
     // send email alert faucet is exhausted
-    sendEmailAlert("Faucet is exhausted")
+    sendEmailAlert('Faucet is exhausted')
 
     return callback('FaucetExhausted', 400)
   }
@@ -122,14 +161,14 @@ export async function register(ip: string, joy: JoyApi, account: string, handle:
     const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
     if (wasBlockedIp) {
       log(`${ip} was throttled`)
-      return callback("TooManyRequests", 429);
+      return callback('TooManyRequests', 429)
     }
 
     // apply global api call limit
     const wasBlockedGlobal = await globalLimiter.limit('global-register')
     if (wasBlockedGlobal) {
       log('global throttled')
-      return callback("TooManyRequests", 429);
+      return callback('TooManyRequests', 429)
     }
   }
 
@@ -156,6 +195,6 @@ export async function register(ip: string, joy: JoyApi, account: string, handle:
     return
   }
 
-  let result: RegisterResult = { memberId, ...registeredAtBlock };
+  let result: RegisterResult = { memberId, ...registeredAtBlock }
   callback(result, 200)
 }
