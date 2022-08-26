@@ -54,7 +54,7 @@ export const EMAIL_ALERTS_LIMIT_MAX_IN_INTERVAL = readEnvInt(
 // unless ip address based authentication is configured.
 export const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY
 // Validated sender address
-export const ALERT_FROM_EMAIL = process.env.ALERT_FROM_EMAIL
+export const ALERT_FROM_EMAIL = process.env.ALERT_FROM_EMAIL || ''
 // For multiple emails messages use a comma separated list. It is preferable
 // to use a single address of a distribution list to send alerts to multiple users if possible.
 export const ALERT_TO_EMAIL = process.env.ALERT_TO_EMAIL
