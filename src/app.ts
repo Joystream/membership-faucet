@@ -6,9 +6,9 @@ import { register } from './register'
 import { AnyJson } from "@polkadot/types/types";
 import bodyParser from 'body-parser';
 import locks from "locks";
+import { PORT } from "./config";
 
 const app = express();
-const port = parseInt(process.env.PORT || '3002');
 const joy = new JoyApi();
 app.use(bodyParser.json())
 
@@ -75,6 +75,6 @@ app.post("/register", async (req, res) => {
   })
 });
 
-app.listen(port, () => {
-  log(`server started at http://localhost:${port}`);
+app.listen(PORT, () => {
+  log(`server started at http://localhost:${PORT}`);
 });

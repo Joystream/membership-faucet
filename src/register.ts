@@ -10,17 +10,15 @@ import { sendEmailAlert } from "./emailAlert";
 import { InMemoryRateLimiter } from "rolling-rate-limiter";
 import {MembershipMetadata} from "@joystream/metadata-protobuf";
 import IExternalResource = MembershipMetadata.IExternalResource;
-
-const GLOBAL_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.GLOBAL_API_LIMIT_INTERVAL_HOURS || '') || 1
-const GLOBAL_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.GLOBAL_API_LIMIT_MAX_IN_INTERVAL || '') || 10
-
-const PER_IP_API_LIMIT_INTERVAL_HOURS = parseInt(process.env.PER_IP_API_LIMIT_INTERVAL_HOURS || '') || 48
-const PER_IP_API_LIMIT_MAX_IN_INTERVAL = parseInt(process.env.PER_IP_API_LIMIT_MAX_IN_INTERVAL || '') || 1
-
-const ENABLE_API_THROTTLING = (() => {
-  const enable = process.env.ENABLE_API_THROTTLING || ''
-  return ['true', 'TRUE', 'yes', 'y', '1', 'on', 'ON'].indexOf(enable) !== -1
-})()
+import {
+  ENABLE_API_THROTTLING,
+  GLOBAL_API_LIMIT_INTERVAL_HOURS,
+  GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
+  MAX_HANDLE_LENGTH,
+  MIN_HANDLE_LENGTH,
+  PER_IP_API_LIMIT_INTERVAL_HOURS,
+  PER_IP_API_LIMIT_MAX_IN_INTERVAL
+} from "./config";
 
 // global rate limit
 const globalLimiter = new InMemoryRateLimiter({
@@ -33,9 +31,6 @@ const ipLimiter = new InMemoryRateLimiter({
   interval: PER_IP_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
   maxInInterval: PER_IP_API_LIMIT_MAX_IN_INTERVAL,
 });
-
-const MIN_HANDLE_LENGTH = 1;
-const MAX_HANDLE_LENGTH = 100;
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
   return getDataFromEvent(events, 'members', 'MembershipGifted', 0)
@@ -164,4 +159,3 @@ export async function register(ip: string, joy: JoyApi, account: string, handle:
   let result: RegisterResult = { memberId, ...registeredAtBlock };
   callback(result, 200)
 }
-

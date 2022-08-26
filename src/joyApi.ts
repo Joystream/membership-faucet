@@ -11,12 +11,10 @@ import { SubmittableExtrinsic } from "@polkadot/api/types";
 import { DispatchError } from "@polkadot/types/interfaces/system";
 import { error } from "./debug";
 import IExternalResource = MembershipMetadata.IExternalResource;
+import { BALANCE_CREDIT, BALANCE_LOCKED, SCREENING_AUTHORITY_SEED, WS_PROVIDER } from "./config";
 
 // Init .env config
 config();
-
-export const BALANCE_CREDIT = parseInt(process.env.BALANCE_CREDIT || '')
-export const BALANCE_LOCKED = parseInt(process.env.BALANCE_LOCKED || '')
 
 export class ErrorWithData extends Error {
   code: number = 400;
@@ -58,7 +56,7 @@ export class JoyApi {
   constructor(endpoint?: string) {
     this.keyring = new Keyring({ type: 'sr25519', ss58Format: JOYSTREAM_ADDRESS_PREFIX })
     const wsEndpoint =
-      endpoint || process.env.PROVIDER || "ws://127.0.0.1:9944";
+      endpoint || WS_PROVIDER || "ws://127.0.0.1:9944";
     this.endpoint = wsEndpoint;
     this.isReady = (async () => {
       const api = await new ApiPromise({ provider: new WsProvider(wsEndpoint) })
@@ -69,9 +67,8 @@ export class JoyApi {
   get init(): Promise<JoyApi> {
     return this.isReady.then((instance) => {
       this.api = instance;
-      const screeningAuthoritySeed = process.env.INVITER_KEY || '//Alice'
       // Fails unless we do this after api is ready
-      this.signingPair = this.keyring.addFromUri(screeningAuthoritySeed, undefined, 'sr25519');
+      this.signingPair = this.keyring.addFromUri(SCREENING_AUTHORITY_SEED, undefined, 'sr25519');
       return this;
     });
   }
@@ -205,11 +202,9 @@ export class JoyApi {
   async invitingAccountHasFundsToGift(tx: SubmittableExtrinsic<'promise'>): Promise<boolean> {
     const balance = await this.api.derive.balances.all(this.signingPair!.address)
     const membershipFee = await this.api.query.members.membershipPrice()
-    const credit = createType('u128', BALANCE_CREDIT)
+    const credit = createType('u128', BALANCE_CREDIT || 0)
     const txFees = (await tx.paymentInfo(this.signingPair!.address)).partialFee
     const requiredFunds = membershipFee.add(txFees).add(credit)
     return balance.availableBalance.gt(requiredFunds)
   }
 }
-
-
