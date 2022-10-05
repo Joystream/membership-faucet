@@ -25,20 +25,41 @@ app.get('/ip', (request, response) => response.send(request.ip))
 app.get('/status', async (req, res) => {
   await joy.init
   const { isSyncing } = await joy.api.rpc.system.health()
-  if (isSyncing.isTrue) {
-    res.setHeader('Content-Type', 'application/json')
-    res.send({
-      ready: false,
+  const isReady = !isSyncing.isTrue
+
+  res.setHeader('Content-Type', 'application/json')
+  if (!isReady) {
+    res.status(503).send({
+      isSynced: false,
+      hasEnoughFunds: null,
       message: 'Chain is still syncing',
     })
     return
-  } else {
-    res.setHeader('Content-Type', 'application/json')
-    res.send({
-      ready: true,
-      message: 'All Systems Go!',
-    })
   }
+
+  const exampleGiftMembershipTx = joy.makeGiftMembershipTx({
+    account: '5Dbstm8wPgrKAwHeMe8xxqxDXyFmP3jyzYdmsiiwTdCdt9iU', // just a random account
+    handle: 'new_member',
+    avatar: 'https://example.com/avatar.png',
+  })
+  const hasEnoughFunds = await joy.invitingAccountHasFundsToGift(
+    exampleGiftMembershipTx
+  )
+
+  if (!hasEnoughFunds) {
+    res.status(503).send({
+      isSynced: true,
+      hasEnoughFunds: false,
+      message: 'Inviting account does not have enough funds to gift membership',
+    })
+    return
+  }
+
+  res.status(200).send({
+    isSynced: true,
+    hasEnoughFunds: true,
+    message: 'All Systems Go!',
+  })
 })
 
 app.post('/register', async (req, res) => {
