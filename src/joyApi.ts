@@ -122,13 +122,13 @@ export class JoyApi {
     const storageSize = await this.api.query.members.memberIdByHandleHash.size(
       handleHash
     )
-    return !storageSize.eq(0)
+    return !storageSize.isZero()
   }
 
   async isFreshAccount(address: string): Promise<boolean> {
     const nonce = await this.api.rpc.system.accountNextIndex(address)
     const balance = (await this.api.derive.balances.all(address)).freeBalance
-    return nonce.eq(0) && balance.eqn(0)
+    return nonce.isZero() && balance.isZero()
   }
 
   async blockHeightFromHash(blockHash: Hash): Promise<number> {
