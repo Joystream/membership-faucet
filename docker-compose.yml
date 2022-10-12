@@ -1,0 +1,10 @@
+version: '3.4'
+services:
+  faucet:
+    image: joystream/faucet
+    restart: unless-stopped
+    container_name: faucet
+    env_file:
+      - .env
+    ports:
+      - "$PORT:$PORT"
