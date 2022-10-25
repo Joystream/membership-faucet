@@ -189,14 +189,14 @@ export async function register(
     const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
     if (wasBlockedIp) {
       log(`${ip} was throttled`)
-      return callback('TooManyRequests', 429)
+      return callback({ error: 'TooManyRequestsPerIp' }, 429)
     }
 
     // apply global api call limit
     const wasBlockedGlobal = await globalLimiter.limit('global-register')
     if (wasBlockedGlobal) {
       log('global throttled')
-      return callback('TooManyRequests', 429)
+      return callback({ error: 'TooManyRequests' }, 429)
     }
   }
 
