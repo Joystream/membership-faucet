@@ -95,6 +95,33 @@ export async function register(
     }
   }
 
+  if (ENABLE_API_THROTTLING) {
+    // Disable IP throttling for valid captcha bypass requests
+    if (captchaBypassKey && captchaBypassKey !== CAPTCHA_BYPASS_KEY) {
+      callback(
+        {
+          error: 'InvalidCaptchaBypassKey',
+        },
+        403
+      )
+      return
+    } else {
+      // apply limit per ip address
+      const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
+      if (wasBlockedIp) {
+        log(`${ip} was throttled`)
+        return callback({ error: 'TooManyRequestsPerIp' }, 429)
+      }
+
+      // apply global api call limit
+      const wasBlockedGlobal = await globalLimiter.limit('global-register')
+      if (wasBlockedGlobal) {
+        log('global throttled')
+        return callback({ error: 'TooManyRequests' }, 429)
+      }
+    }
+  }
+
   await joy.init
 
   // Validate address
@@ -193,22 +220,6 @@ export async function register(
     sendEmailAlert('Faucet is exhausted')
 
     return callback('FaucetExhausted', 400)
-  }
-
-  if (ENABLE_API_THROTTLING) {
-    // apply limit per ip address
-    const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
-    if (wasBlockedIp) {
-      log(`${ip} was throttled`)
-      return callback({ error: 'TooManyRequestsPerIp' }, 429)
-    }
-
-    // apply global api call limit
-    const wasBlockedGlobal = await globalLimiter.limit('global-register')
-    if (wasBlockedGlobal) {
-      log('global throttled')
-      return callback({ error: 'TooManyRequests' }, 429)
-    }
   }
 
   let memberId: MemberId | undefined
