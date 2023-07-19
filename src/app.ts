@@ -93,6 +93,11 @@ app.post('/register', async (req, res) => {
     captchaToken,
   } = req.body
 
+  const captchaBypassKey = (req: express.Request) => {
+    const authHeader = req.headers['authorization']
+    return authHeader && authHeader.split(' ')[1]
+  }
+
   processingRequest.lock(async () => {
     try {
       await register(
@@ -105,6 +110,7 @@ app.post('/register', async (req, res) => {
         about,
         externalResources,
         captchaToken,
+        captchaBypassKey(req),
         callback
       )
     } catch (err) {

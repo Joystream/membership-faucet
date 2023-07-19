@@ -67,3 +67,7 @@ export const ALERT_TO_EMAIL = process.env.ALERT_TO_EMAIL
 export const HCAPTCHA_ENDPOINT = 'https://hcaptcha.com/siteverify'
 export const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET
 export const HCAPTCHA_ENABLED = HCAPTCHA_ENDPOINT && HCAPTCHA_SECRET
+
+// A server-side configured key that client should send (in the `Authorization` header) along with
+// the request to `/register` endpoint if they want to bypass the captcha verification requirement.
+export const CAPTCHA_BYPASS_KEY = process.env.CAPTCHA_BYPASS_KEY

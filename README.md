@@ -24,8 +24,8 @@ Will build and start the server.
 
 ## API
 
-### `POST /register`
-Send a JSON in the request body:
+### `POST -H Authorization: Bearer {CAPTCHA_BYPASS_KEY} /register`
+Send a JSON in the request body with an optional Bearer Authentication (if request wants to bypass captcha verification):
 
 ```
 {

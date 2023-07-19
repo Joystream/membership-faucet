@@ -12,6 +12,7 @@ import { MembershipMetadata } from '@joystream/metadata-protobuf'
 import IExternalResource = MembershipMetadata.IExternalResource
 import {
   ENABLE_API_THROTTLING,
+  CAPTCHA_BYPASS_KEY,
   GLOBAL_API_LIMIT_INTERVAL_HOURS,
   GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
   HCAPTCHA_ENABLED,
@@ -56,12 +57,21 @@ export async function register(
   avatar: string | undefined,
   about: string,
   externalResources: IExternalResource[],
-  captchaToken: string,
+  captchaToken: string | undefined,
+  captchaBypassKey: string | undefined,
   callback: RegisterCallback
 ) {
   // verify captcha if enabled
   if (HCAPTCHA_ENABLED) {
-    if (!captchaToken) {
+    if (captchaBypassKey && captchaBypassKey !== CAPTCHA_BYPASS_KEY) {
+      callback(
+        {
+          error: 'InvalidCaptchaBypassKey',
+        },
+        403
+      )
+      return
+    } else if (!captchaToken) {
       callback(
         {
           error: 'MissingCaptchaToken',
@@ -69,18 +79,19 @@ export async function register(
         400
       )
       return
-    }
-    const captchaResult = await verifyCaptcha(captchaToken)
-    if (captchaResult !== true) {
-      log('captcha verification failed')
-      callback(
-        {
-          error: 'InvalidCaptchaToken',
-          errorCodes: captchaResult,
-        },
-        400
-      )
-      return
+    } else {
+      const captchaResult = await verifyCaptcha(captchaToken)
+      if (captchaResult !== true) {
+        log('captcha verification failed')
+        callback(
+          {
+            error: 'InvalidCaptchaToken',
+            errorCodes: captchaResult,
+          },
+          400
+        )
+        return
+      }
     }
   }
 
