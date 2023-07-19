@@ -29,10 +29,16 @@ const globalLimiter = new InMemoryRateLimiter({
   maxInInterval: GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
 })
 
-// per ip rate limit
+// per ip rate limit to apply after input validation checks
 const ipLimiter = new InMemoryRateLimiter({
   interval: PER_IP_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
   maxInInterval: PER_IP_API_LIMIT_MAX_IN_INTERVAL,
+})
+
+// very aggressive ip limit for failed authentication
+const authLimiter = new InMemoryRateLimiter({
+  interval: 1 * 60 * 60 * 1000, // milliseconds
+  maxInInterval: 3,
 })
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
@@ -61,17 +67,29 @@ export async function register(
   captchaBypassKey: string | undefined,
   callback: RegisterCallback
 ) {
-  // verify captcha if enabled
-  if (HCAPTCHA_ENABLED) {
-    if (captchaBypassKey && captchaBypassKey !== CAPTCHA_BYPASS_KEY) {
+
+  let canBypass = false
+  // Check if request is authorized to bypass captcha verification and ip rate limits
+  if ((HCAPTCHA_ENABLED || ENABLE_API_THROTTLING) && captchaBypassKey && CAPTCHA_BYPASS_KEY) {
+    const wasBlockedIp = await authLimiter.limit(`${ip}-auth`)
+    if((captchaBypassKey !== CAPTCHA_BYPASS_KEY) || wasBlockedIp) {
       callback(
         {
-          error: 'InvalidCaptchaBypassKey',
+          error: 'Unauthorized', // keep it general, no need to reveal if throttle or bad key
         },
         403
       )
+      log(`Too many failed auth attempts from ${ip}`)
       return
-    } else if (!captchaToken) {
+    } else {
+      authLimiter.clear(`${ip}-auth`)
+      canBypass = true
+    }
+  }
+
+  // verify captcha if enabled
+  if (HCAPTCHA_ENABLED && !canBypass) {
+    if (!captchaToken) {
       callback(
         {
           error: 'MissingCaptchaToken',
@@ -91,33 +109,6 @@ export async function register(
           400
         )
         return
-      }
-    }
-  }
-
-  if (ENABLE_API_THROTTLING) {
-    // Disable IP throttling for valid captcha bypass requests
-    if (captchaBypassKey && captchaBypassKey !== CAPTCHA_BYPASS_KEY) {
-      callback(
-        {
-          error: 'InvalidCaptchaBypassKey',
-        },
-        403
-      )
-      return
-    } else {
-      // apply limit per ip address
-      const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
-      if (wasBlockedIp) {
-        log(`${ip} was throttled`)
-        return callback({ error: 'TooManyRequestsPerIp' }, 429)
-      }
-
-      // apply global api call limit
-      const wasBlockedGlobal = await globalLimiter.limit('global-register')
-      if (wasBlockedGlobal) {
-        log('global throttled')
-        return callback({ error: 'TooManyRequests' }, 429)
       }
     }
   }
@@ -220,6 +211,24 @@ export async function register(
     sendEmailAlert('Faucet is exhausted')
 
     return callback('FaucetExhausted', 400)
+  }
+
+  // Do throttling after all input validation checks to avoid DoS attack by someone repeatedly
+  // trying to register with most likely outcome being unsuccsessful.
+  if (ENABLE_API_THROTTLING && !canBypass) {
+    // apply limit per ip address
+    const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
+    if (wasBlockedIp) {
+      log(`${ip} was throttled`)
+      return callback({ error: 'TooManyRequestsPerIp' }, 429)
+    }
+
+    // apply global api call limit
+    const wasBlockedGlobal = await globalLimiter.limit('global-register')
+    if (wasBlockedGlobal) {
+      log('global throttled')
+      return callback({ error: 'TooManyRequests' }, 429)
+    }
   }
 
   let memberId: MemberId | undefined
