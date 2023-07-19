@@ -12,6 +12,7 @@ import { MembershipMetadata } from '@joystream/metadata-protobuf'
 import IExternalResource = MembershipMetadata.IExternalResource
 import {
   ENABLE_API_THROTTLING,
+  CAPTCHA_BYPASS_KEY,
   GLOBAL_API_LIMIT_INTERVAL_HOURS,
   GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
   HCAPTCHA_ENABLED,
@@ -28,10 +29,16 @@ const globalLimiter = new InMemoryRateLimiter({
   maxInInterval: GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
 })
 
-// per ip rate limit
+// per ip rate limit to apply after input validation checks
 const ipLimiter = new InMemoryRateLimiter({
   interval: PER_IP_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
   maxInInterval: PER_IP_API_LIMIT_MAX_IN_INTERVAL,
+})
+
+// very aggressive ip limit for failed authentication
+const authLimiter = new InMemoryRateLimiter({
+  interval: 1 * 60 * 60 * 1000, // milliseconds
+  maxInInterval: 3,
 })
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
@@ -56,11 +63,32 @@ export async function register(
   avatar: string | undefined,
   about: string,
   externalResources: IExternalResource[],
-  captchaToken: string,
+  captchaToken: string | undefined,
+  captchaBypassKey: string | undefined,
   callback: RegisterCallback
 ) {
+
+  let canBypass = false
+  // Check if request is authorized to bypass captcha verification and ip rate limits
+  if ((HCAPTCHA_ENABLED || ENABLE_API_THROTTLING) && captchaBypassKey && CAPTCHA_BYPASS_KEY) {
+    const wasBlockedIp = await authLimiter.limit(`${ip}-auth`)
+    if((captchaBypassKey !== CAPTCHA_BYPASS_KEY) || wasBlockedIp) {
+      callback(
+        {
+          error: 'Unauthorized', // keep it general, no need to reveal if throttle or bad key
+        },
+        403
+      )
+      log(`Too many failed auth attempts from ${ip}`)
+      return
+    } else {
+      authLimiter.clear(`${ip}-auth`)
+      canBypass = true
+    }
+  }
+
   // verify captcha if enabled
-  if (HCAPTCHA_ENABLED) {
+  if (HCAPTCHA_ENABLED && !canBypass) {
     if (!captchaToken) {
       callback(
         {
@@ -69,18 +97,19 @@ export async function register(
         400
       )
       return
-    }
-    const captchaResult = await verifyCaptcha(captchaToken)
-    if (captchaResult !== true) {
-      log('captcha verification failed')
-      callback(
-        {
-          error: 'InvalidCaptchaToken',
-          errorCodes: captchaResult,
-        },
-        400
-      )
-      return
+    } else {
+      const captchaResult = await verifyCaptcha(captchaToken)
+      if (captchaResult !== true) {
+        log('captcha verification failed')
+        callback(
+          {
+            error: 'InvalidCaptchaToken',
+            errorCodes: captchaResult,
+          },
+          400
+        )
+        return
+      }
     }
   }
 
@@ -184,7 +213,9 @@ export async function register(
     return callback('FaucetExhausted', 400)
   }
 
-  if (ENABLE_API_THROTTLING) {
+  // Do throttling after all input validation checks to avoid DoS attack by someone repeatedly
+  // trying to register with most likely outcome being unsuccsessful.
+  if (ENABLE_API_THROTTLING && !canBypass) {
     // apply limit per ip address
     const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
     if (wasBlockedIp) {

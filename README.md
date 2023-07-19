@@ -24,8 +24,8 @@ Will build and start the server.
 
 ## API
 
-### `POST /register`
-Send a JSON in the request body:
+### `POST -H Authorization: Bearer {CAPTCHA_BYPASS_KEY} /register`
+Send a JSON in the request body with an optional Bearer Authentication (if request wants to bypass captcha verification):
 
 ```
 {
@@ -108,4 +108,4 @@ docker compose up -d
 ### Setup Reverse proxy
 The webserice will be listening on localhost on the port you configured in your .env file.
 To make the service available publicly you will need to setup a reverse proxy with an ssl certificate.
-Nginx and caddy are good options. Example usage of caddy in [docker/docke-compose stack](https://hub.docker.com/_/caddy)
+Nginx and caddy are good options. Example usage of caddy with [docker/docker-compose stack](https://hub.docker.com/_/caddy)
