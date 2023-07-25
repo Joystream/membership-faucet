@@ -38,6 +38,10 @@ new prom.Gauge({
     this.set(info.actionsRemaining)
   },
 })
+export async function getGlobalRemainingRegistrations() {
+  const info = await globalLimiter.wouldLimitWithInfo(GLOBAL_REGISTER_ID)
+  return info.actionsRemaining
+}
 
 // per ip rate limit to apply after input validation checks
 const ipLimiter = new InMemoryRateLimiter({

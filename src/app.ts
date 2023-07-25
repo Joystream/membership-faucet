@@ -2,7 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import { log } from './debug'
 import { JoyApi } from './joyApi'
-import { register } from './register'
+import { register, getGlobalRemainingRegistrations } from './register'
 import { AnyJson } from '@polkadot/types/types'
 import bodyParser from 'body-parser'
 import locks from 'locks'
@@ -53,6 +53,7 @@ app.get('/status', async (req, res) => {
   await joy.init
   const { isSyncing } = await joy.api.rpc.system.health()
   const isReady = !isSyncing.isTrue
+  const limit = await getGlobalRemainingRegistrations()
 
   res.setHeader('Content-Type', 'application/json')
   if (!isReady) {
@@ -60,6 +61,7 @@ app.get('/status', async (req, res) => {
       isSynced: false,
       hasEnoughFunds: null,
       message: 'Chain is still syncing',
+      limit,
     })
     return
   }
@@ -78,6 +80,7 @@ app.get('/status', async (req, res) => {
       isSynced: true,
       hasEnoughFunds: false,
       message: 'Inviting account does not have enough funds to gift membership',
+      limit,
     })
     return
   }
@@ -86,6 +89,7 @@ app.get('/status', async (req, res) => {
     isSynced: true,
     hasEnoughFunds: true,
     message: 'All Systems Go!',
+    limit,
   })
 })
 
