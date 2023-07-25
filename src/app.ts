@@ -72,14 +72,15 @@ app.get('/status', async (req, res) => {
     avatar: 'https://example.com/avatar.png',
   })
   const hasEnoughFunds = await joy.invitingAccountHasFundsToGift(
-    exampleGiftMembershipTx
+    exampleGiftMembershipTx,
+    5
   )
 
   if (!hasEnoughFunds) {
     res.status(503).send({
       isSynced: true,
       hasEnoughFunds: false,
-      message: 'Inviting account does not have enough funds to gift membership',
+      message: 'Inviting account has limited funds for at most 5 new members.',
       limit,
     })
     return
@@ -146,7 +147,7 @@ app.post('/register', async (req, res) => {
   }
 
   processingRequest.lock(async () => {
-    const end = metrics.response_time.startTimer()
+    const stopTimer = metrics.response_time.startTimer()
     try {
       await register(
         req.ip,
@@ -170,7 +171,7 @@ app.post('/register', async (req, res) => {
         1
       )
     }
-    metrics.response_time.observe(end())
+    stopTimer()
   })
 })
 

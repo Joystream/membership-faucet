@@ -220,8 +220,10 @@ export class JoyApi {
     })
   }
 
+  // Checks if balance has enough to gift N new memberships
   async invitingAccountHasFundsToGift(
-    tx: SubmittableExtrinsic<'promise'>
+    tx: SubmittableExtrinsic<'promise'>,
+    N: number = 1
   ): Promise<boolean> {
     const balance = await this.api.derive.balances.all(
       this.signingPair!.address
@@ -229,7 +231,10 @@ export class JoyApi {
     const membershipFee = await this.api.query.members.membershipPrice()
     const credit = createType('u128', BALANCE_CREDIT || 0)
     const txFees = (await tx.paymentInfo(this.signingPair!.address)).partialFee
-    const requiredFunds = membershipFee.add(txFees).add(credit)
+    const requiredFunds = membershipFee
+      .add(txFees)
+      .add(credit)
+      .mul(createType('u128', N))
     return balance.availableBalance.gt(requiredFunds)
   }
 }
