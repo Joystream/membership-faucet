@@ -17,14 +17,20 @@ export const metrics = {
   register_failure_user: new prom.Counter({
     name: 'register_failure_user',
     help: 'Failure due user input.',
+    labelNames: ['code'],
   }),
   register_failure_server: new prom.Counter({
     name: 'register_failure_server',
     help: 'Failure due to internal server error.',
+    labelNames: ['code', 'reason'],
   }),
   register_attempt: new prom.Counter({
     name: 'register_attempt',
     help: 'Total registration attempts.',
+  }),
+  response_time: new prom.Histogram({
+    name: 'register_response',
+    help: 'response time',
   }),
 }
 
@@ -96,7 +102,10 @@ app.post('/register', async (req, res) => {
     res.status(500).send({
       error: 'NodeNotReady',
     })
-    metrics.register_failure_server.inc(1)
+    metrics.register_failure_server.inc(
+      { code: 500, reason: 'still_syncing' },
+      1
+    )
     return
   }
 
@@ -104,12 +113,16 @@ app.post('/register', async (req, res) => {
     processingRequest.unlock()
     res.setHeader('Content-Type', 'application/json')
     res.status(statusCode).send(result)
+    const { error } = result as any
     if (statusCode >= 500) {
-      metrics.register_failure_server.inc(1)
+      metrics.register_failure_server.inc(
+        { code: statusCode, reason: error },
+        1
+      )
     } else if (statusCode >= 400) {
-      metrics.register_failure_user.inc(1)
-    } else if (statusCode == 200) {
-      metrics.register_success.inc(1)
+      metrics.register_failure_user.inc({ code: statusCode }, 1)
+    } else {
+      metrics.register_success.inc({ code: statusCode }, 1)
     }
   }
 
@@ -129,6 +142,7 @@ app.post('/register', async (req, res) => {
   }
 
   processingRequest.lock(async () => {
+    const end = metrics.response_time.startTimer()
     try {
       await register(
         req.ip,
@@ -147,8 +161,12 @@ app.post('/register', async (req, res) => {
       processingRequest.unlock()
       log(err)
       res.status(500).end()
-      metrics.register_failure_server.inc(1)
+      metrics.register_failure_server.inc(
+        { code: 500, reason: 'internal_error' },
+        1
+      )
     }
+    metrics.response_time.observe(end())
   })
 })
 

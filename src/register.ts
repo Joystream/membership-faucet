@@ -36,7 +36,7 @@ new prom.Gauge({
   collect: async function () {
     const info = await globalLimiter.wouldLimitWithInfo(GLOBAL_REGISTER_ID)
     this.set(info.actionsRemaining)
-  }
+  },
 })
 
 // per ip rate limit to apply after input validation checks
