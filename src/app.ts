@@ -13,6 +13,7 @@ export const metrics = {
   register_success: new prom.Counter({
     name: 'register_success',
     help: 'Total successful registrations.',
+    labelNames: ['code'],
   }),
   register_failure_user: new prom.Counter({
     name: 'register_failure_user',
@@ -162,16 +163,16 @@ app.post('/register', async (req, res) => {
         callback
       )
     } catch (err) {
-      processingRequest.unlock()
       log(err)
       res.status(500).end()
       metrics.register_failure_server.inc(
         { code: 500, reason: 'internal_error' },
         1
       )
+    } finally {
+      processingRequest.unlock()
+      stopTimer()
     }
-    processingRequest.unlock()
-    stopTimer()
   })
 })
 
