@@ -115,7 +115,6 @@ app.post('/register', async (req, res) => {
   }
 
   const callback = (result: AnyJson, statusCode: number) => {
-    processingRequest.unlock()
     res.setHeader('Content-Type', 'application/json')
     res.status(statusCode).send(result)
     const { error } = result as any
@@ -171,6 +170,7 @@ app.post('/register', async (req, res) => {
         1
       )
     }
+    processingRequest.unlock()
     stopTimer()
   })
 })
