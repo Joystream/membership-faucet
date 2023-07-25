@@ -6,9 +6,30 @@ import { register } from './register'
 import { AnyJson } from '@polkadot/types/types'
 import bodyParser from 'body-parser'
 import locks from 'locks'
-import { HCAPTCHA_ENABLED, PORT } from './config'
+import { HCAPTCHA_ENABLED, PORT, PROMETHEUS_PORT } from './config'
+import prom from 'prom-client'
+
+export const metrics = {
+  register_success: new prom.Counter({
+    name: 'register_success',
+    help: 'Total successful registrations.',
+  }),
+  register_failure_user: new prom.Counter({
+    name: 'register_failure_user',
+    help: 'Failure due user input.',
+  }),
+  register_failure_server: new prom.Counter({
+    name: 'register_failure_server',
+    help: 'Failure due to internal server error.',
+  }),
+  register_attempt: new prom.Counter({
+    name: 'register_attempt',
+    help: 'Total registration attempts.',
+  }),
+}
 
 const app = express()
+
 const joy = new JoyApi()
 app.use(bodyParser.json())
 
@@ -64,6 +85,7 @@ app.get('/status', async (req, res) => {
 
 app.post('/register', async (req, res) => {
   log(`register request for ${req.body.handle} from ${req.ip}`)
+  metrics.register_attempt.inc(1)
 
   await joy.init
 
@@ -74,6 +96,7 @@ app.post('/register', async (req, res) => {
     res.status(500).send({
       error: 'NodeNotReady',
     })
+    metrics.register_failure_server.inc(1)
     return
   }
 
@@ -81,6 +104,13 @@ app.post('/register', async (req, res) => {
     processingRequest.unlock()
     res.setHeader('Content-Type', 'application/json')
     res.status(statusCode).send(result)
+    if (statusCode >= 500) {
+      metrics.register_failure_server.inc(1)
+    } else if (statusCode >= 400) {
+      metrics.register_failure_user.inc(1)
+    } else if (statusCode == 200) {
+      metrics.register_success.inc(1)
+    }
   }
 
   const {
@@ -117,6 +147,7 @@ app.post('/register', async (req, res) => {
       processingRequest.unlock()
       log(err)
       res.status(500).end()
+      metrics.register_failure_server.inc(1)
     }
   })
 })
@@ -124,4 +155,14 @@ app.post('/register', async (req, res) => {
 app.listen(PORT, () => {
   log(`server started at http://localhost:${PORT}`)
   log(`captcha ${HCAPTCHA_ENABLED ? 'enabled' : 'disabled'}`)
+})
+
+const prometheus = express()
+prometheus.get('/metrics', async (request, response) => {
+  response.set('Content-Type', prom.register.contentType)
+  response.send(await prom.register.metrics())
+})
+
+prometheus.listen(PROMETHEUS_PORT, () => {
+  log(`prometheus metrics at http://localhost:${PROMETHEUS_PORT}/metrics`)
 })

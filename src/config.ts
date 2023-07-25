@@ -13,6 +13,7 @@ function readEnvInt<T>(key: string, defaultValue: T): number | T {
 }
 
 export const PORT = parseInt(process.env.PORT || '3002')
+export const PROMETHEUS_PORT = parseInt(process.env.PROMETHEUS_PORT || '3003')
 export const WS_PROVIDER = process.env.PROVIDER
 export const SCREENING_AUTHORITY_SEED = process.env.INVITER_KEY || '//Alice'
 

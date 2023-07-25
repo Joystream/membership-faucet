@@ -22,23 +22,37 @@ import {
   PER_IP_API_LIMIT_MAX_IN_INTERVAL,
 } from './config'
 import { verifyCaptcha } from './captcha'
+import prom from 'prom-client'
 
 // global rate limit
+const GLOBAL_REGISTER_ID = 'global-register'
 const globalLimiter = new InMemoryRateLimiter({
   interval: GLOBAL_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
   maxInInterval: GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
+})
+new prom.Gauge({
+  name: 'register_global_limit',
+  help: 'Number of registrations allowed remaining in interval',
+  collect: async function () {
+    const info = await globalLimiter.wouldLimitWithInfo(GLOBAL_REGISTER_ID)
+    this.set(info.actionsRemaining)
+  }
 })
 
 // per ip rate limit to apply after input validation checks
 const ipLimiter = new InMemoryRateLimiter({
   interval: PER_IP_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
   maxInInterval: PER_IP_API_LIMIT_MAX_IN_INTERVAL,
+  // The minimum time allowed between consecutive actions, in milliseconds.
+  minDifference: 1000,
 })
 
 // very aggressive ip limit for failed authentication
 const authLimiter = new InMemoryRateLimiter({
   interval: 1 * 60 * 60 * 1000, // milliseconds
   maxInInterval: 3,
+  // The minimum time allowed between consecutive actions, in milliseconds.
+  minDifference: 1000,
 })
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
@@ -67,12 +81,15 @@ export async function register(
   captchaBypassKey: string | undefined,
   callback: RegisterCallback
 ) {
-
   let canBypass = false
   // Check if request is authorized to bypass captcha verification and ip rate limits
-  if ((HCAPTCHA_ENABLED || ENABLE_API_THROTTLING) && captchaBypassKey && CAPTCHA_BYPASS_KEY) {
+  if (
+    (HCAPTCHA_ENABLED || ENABLE_API_THROTTLING) &&
+    captchaBypassKey &&
+    CAPTCHA_BYPASS_KEY
+  ) {
     const wasBlockedIp = await authLimiter.limit(`${ip}-auth`)
-    if((captchaBypassKey !== CAPTCHA_BYPASS_KEY) || wasBlockedIp) {
+    if (captchaBypassKey !== CAPTCHA_BYPASS_KEY || wasBlockedIp) {
       callback(
         {
           error: 'Unauthorized', // keep it general, no need to reveal if throttle or bad key
@@ -210,7 +227,7 @@ export async function register(
     // send email alert faucet is exhausted
     sendEmailAlert('Faucet is exhausted')
 
-    return callback('FaucetExhausted', 400)
+    return callback({ error: 'FaucetExhausted' }, 500)
   }
 
   // Do throttling after all input validation checks to avoid DoS attack by someone repeatedly
@@ -224,7 +241,7 @@ export async function register(
     }
 
     // apply global api call limit
-    const wasBlockedGlobal = await globalLimiter.limit('global-register')
+    const wasBlockedGlobal = await globalLimiter.limit(GLOBAL_REGISTER_ID)
     if (wasBlockedGlobal) {
       log('global throttled')
       return callback({ error: 'TooManyRequests' }, 429)
