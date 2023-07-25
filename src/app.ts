@@ -18,7 +18,7 @@ export const metrics = {
   register_failure_user: new prom.Counter({
     name: 'register_failure_user',
     help: 'Failure due user input.',
-    labelNames: ['code'],
+    labelNames: ['code', 'reason'],
   }),
   register_failure_server: new prom.Counter({
     name: 'register_failure_server',
@@ -125,7 +125,7 @@ app.post('/register', async (req, res) => {
         1
       )
     } else if (statusCode >= 400) {
-      metrics.register_failure_user.inc({ code: statusCode }, 1)
+      metrics.register_failure_user.inc({ code: statusCode, reason: error }, 1)
     } else {
       metrics.register_success.inc({ code: statusCode }, 1)
     }
