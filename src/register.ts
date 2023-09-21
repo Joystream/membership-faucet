@@ -121,7 +121,7 @@ export async function register(
     } else {
       const captchaResult = await verifyCaptcha(captchaToken)
       if (captchaResult !== true) {
-        log('captcha verification failed')
+        log('captcha verification failed:', captchaResult)
         callback(
           {
             error: 'InvalidCaptchaToken',

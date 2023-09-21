@@ -1,4 +1,4 @@
-import { error } from './debug'
+import { log, error } from './debug'
 import { HCAPTCHA_ENDPOINT, HCAPTCHA_SECRET } from './config'
 import fetch from 'node-fetch'
 
@@ -10,11 +10,19 @@ export type CaptchaResponse = {
   'error-codes'?: string[] // optional: any error codes
 }
 
+const observedTokens = new Set()
+
 export async function verifyCaptcha(
   token: string
 ): Promise<true | undefined | string[]> {
   if (!HCAPTCHA_SECRET) {
     return true
+  }
+
+  if(observedTokens.has(token)) {
+    log('Token reuse:', token)
+  } else {
+    observedTokens.add(token)
   }
 
   const formData = new URLSearchParams()
@@ -31,12 +39,13 @@ export async function verifyCaptcha(
     })
     const data = (await response.json()) as CaptchaResponse
     if (data.success) {
+      log('Captcha verification success:', data.hostname, data.challenge_ts)
       return true
     } else {
       return data['error-codes']
     }
   } catch (e) {
     error('Captcha verification error:', e)
-    return ['Unexpected error']
+    return ['unexpected-error']
   }
 }
