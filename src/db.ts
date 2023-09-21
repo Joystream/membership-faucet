@@ -1,14 +1,10 @@
-import low from "lowdb";
-import FileAsync from "lowdb/adapters/FileAsync";
+import low from 'lowdb'
+import FileAsync from 'lowdb/adapters/FileAsync'
 // import { log } from './debug';
 
-type Schema = {
-};
+type Schema = {}
 
-const adapter = new FileAsync<Schema>("members-created.json");
-const db = low(adapter);
+const adapter = new FileAsync<Schema>('members-created.json')
+const db = low(adapter)
 
-export { 
-  db,
-  Schema,
-};
+export { db, Schema }

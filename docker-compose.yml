@@ -1,0 +1,16 @@
+version: '3.4'
+services:
+  faucet:
+    image: joystream/faucet
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    container_name: faucet
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "$PORT:$PORT"
+      - "127.0.0.1:$PROMETHEUS_PORT:$PROMETHEUS_PORT"

@@ -1,139 +1,283 @@
-import { JoyApi } from "./joyApi";
-import { EventRecord } from '@polkadot/types/interfaces';
-import { MemberId } from '@joystream/types/members';
+import { ErrorWithData, JoyApi } from './joyApi'
+import { EventRecord } from '@polkadot/types/interfaces'
 import { decodeAddress } from '@polkadot/keyring'
-import { log } from './debug';
-import { DispatchError } from '@polkadot/types/interfaces/system'
-import { TypeRegistry } from '@polkadot/types'
+import { log, error } from './debug'
+import BN from 'bn.js'
+import { MemberId } from '@joystream/types/primitives'
+import type { Hash } from '@polkadot/types/interfaces/runtime'
+import { getDataFromEvent } from './utils'
+import { sendEmailAlert } from './emailAlert'
+import { InMemoryRateLimiter } from 'rolling-rate-limiter'
+import { MembershipMetadata } from '@joystream/metadata-protobuf'
+import IExternalResource = MembershipMetadata.IExternalResource
+import {
+  ENABLE_API_THROTTLING,
+  CAPTCHA_BYPASS_KEY,
+  GLOBAL_API_LIMIT_INTERVAL_HOURS,
+  GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
+  HCAPTCHA_ENABLED,
+  MAX_HANDLE_LENGTH,
+  MIN_HANDLE_LENGTH,
+  PER_IP_API_LIMIT_INTERVAL_HOURS,
+  PER_IP_API_LIMIT_MAX_IN_INTERVAL,
+} from './config'
+import { verifyCaptcha } from './captcha'
+import prom from 'prom-client'
+
+// global rate limit
+const GLOBAL_REGISTER_ID = 'global-register'
+const globalLimiter = new InMemoryRateLimiter({
+  interval: GLOBAL_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
+  maxInInterval: GLOBAL_API_LIMIT_MAX_IN_INTERVAL,
+})
+new prom.Gauge({
+  name: 'register_global_limit',
+  help: 'Number of registrations allowed remaining in interval',
+  collect: async function () {
+    const info = await globalLimiter.wouldLimitWithInfo(GLOBAL_REGISTER_ID)
+    this.set(info.actionsRemaining)
+  },
+})
+export async function getGlobalRemainingRegistrations() {
+  const info = await globalLimiter.wouldLimitWithInfo(GLOBAL_REGISTER_ID)
+  return info.actionsRemaining
+}
+
+// per ip rate limit to apply after input validation checks
+const ipLimiter = new InMemoryRateLimiter({
+  interval: PER_IP_API_LIMIT_INTERVAL_HOURS * 60 * 60 * 1000, // milliseconds
+  maxInInterval: PER_IP_API_LIMIT_MAX_IN_INTERVAL,
+  // The minimum time allowed between consecutive actions, in milliseconds.
+  minDifference: 1000,
+})
+
+// very aggressive ip limit for failed authentication
+const authLimiter = new InMemoryRateLimiter({
+  interval: 1 * 60 * 60 * 1000, // milliseconds
+  maxInInterval: 3,
+  // The minimum time allowed between consecutive actions, in milliseconds.
+  minDifference: 1000,
+})
 
 function memberIdFromEvent(events: EventRecord[]): MemberId | undefined {
-  const record = events.find((record) => record.event.section === "members" && record.event.method === "MemberRegistered")
-  if (record) {
-    return record.event.data[0] as MemberId
-  } else {
-    return undefined
-  }
+  return getDataFromEvent(events, 'members', 'MembershipGifted', 0)
 }
 
 export type RegisterCallback = (result: any, statusCode: number) => void
 
-export async function register(joy: JoyApi, account: string, handle: string, avatar: string, about: string, callback: RegisterCallback) {
+export type RegisterBlockData =
+  | { block: null }
+  | { block: number; blockHash: Hash }
+export type RegisterResult = {
+  memberId?: number
+} & RegisterBlockData
+
+export async function register(
+  ip: string,
+  joy: JoyApi,
+  account: string,
+  handle: string,
+  name: string | undefined,
+  avatar: string | undefined,
+  about: string,
+  externalResources: IExternalResource[],
+  captchaToken: string | undefined,
+  captchaBypassKey: string | undefined,
+  callback: RegisterCallback
+) {
+  let canBypass = false
+  // Check if request is authorized to bypass captcha verification and ip rate limits
+  if (
+    (HCAPTCHA_ENABLED || ENABLE_API_THROTTLING) &&
+    captchaBypassKey &&
+    CAPTCHA_BYPASS_KEY
+  ) {
+    const wasBlockedIp = await authLimiter.limit(`${ip}-auth`)
+    if (captchaBypassKey !== CAPTCHA_BYPASS_KEY || wasBlockedIp) {
+      callback(
+        {
+          error: 'Unauthorized', // keep it general, no need to reveal if throttle or bad key
+        },
+        403
+      )
+      log(`Too many failed auth attempts from ${ip}`)
+      return
+    } else {
+      authLimiter.clear(`${ip}-auth`)
+      canBypass = true
+    }
+  }
+
+  // verify captcha if enabled
+  if (HCAPTCHA_ENABLED && !canBypass) {
+    if (!captchaToken) {
+      callback(
+        {
+          error: 'MissingCaptchaToken',
+        },
+        400
+      )
+      return
+    } else {
+      const captchaResult = await verifyCaptcha(captchaToken)
+      if (captchaResult !== true) {
+        log('captcha verification failed')
+        callback(
+          {
+            error: 'InvalidCaptchaToken',
+            errorCodes: captchaResult,
+          },
+          400
+        )
+        return
+      }
+    }
+  }
+
   await joy.init
-  const { api } = joy
 
   // Validate address
   try {
     decodeAddress(account)
   } catch (err) {
     log('invalid address supplied')
-    callback({
-      error: 'InvalidAddress',
-    }, 400)
+    callback(
+      {
+        error: 'InvalidAddress',
+      },
+      400
+    )
     return
   }
 
   // Ensure nonce = 0 and balance = 0 for account
   if (!(await joy.isFreshAccount(account))) {
-    callback({
-      error: 'OnlyNewAccountsCanBeUsedForScreenedMembers'
-    }, 400)
+    callback(
+      {
+        error: 'OnlyNewAccountsCanBeUsedForScreenedMembers',
+      },
+      400
+    )
     return
   }
 
-  // validate handle
-  const minHandleLength = await joy.api.query.members.minHandleLength()
-  const maxHandleLength = await joy.api.query.members.maxHandleLength()
+  const minHandleLength = new BN(MIN_HANDLE_LENGTH)
+  const maxHandleLength = new BN(MAX_HANDLE_LENGTH)
 
-  if(maxHandleLength.ltn(handle.length)) {
-    callback({
-      error: 'HandleTooLong'
-    }, 400)
+  if (maxHandleLength.ltn(handle.length)) {
+    callback(
+      {
+        error: 'HandleTooLong',
+      },
+      400
+    )
     return
   }
 
-  if(minHandleLength.gtn(handle.length)) {
-    callback({
-      error: 'HandleTooShort'
-    }, 400)
+  if (minHandleLength.gtn(handle.length)) {
+    callback(
+      {
+        error: 'HandleTooShort',
+      },
+      400
+    )
     return
   }
 
   // Ensure handle is unique
   if (await joy.handleIsAlreadyRegistered(handle)) {
     log('handle already registered')
-    callback({
-      error: 'HandleAlreadyRegistered',
-    }, 400)
+    callback(
+      {
+        error: 'HandleAlreadyRegistered',
+      },
+      400
+    )
     return
   }
 
-  try {
-    const unsubscribe = await joy.addScreenedMember(account, handle, avatar, about, (result) => {
-      if (!result.isCompleted) {
-        return
-      }
-
-      unsubscribe()
-
-      if (result.isError) {
-        log('Failed to register:', result)
-        const { isDropped, isFinalityTimeout, isInvalid, isUsurped } = result.status
-        callback({
-          error: 'TransactionError',
-          reason: {
-            isDropped,
-            isFinalityTimeout,
-            isInvalid,
-            isUsurped,
-          },
-        }, 400)
-        return
-      }
-
-      const success = result.findRecord('system', 'ExtrinsicSuccess')
-      const failed = result.findRecord('system', 'ExtrinsicFailed')
-
-      if(success) {
-        let memberId = memberIdFromEvent(result.events)
-        log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
-
-        const blockHash = result.status.asInBlock
-        joy.blockHeightFromHash(blockHash)
-          .then((blockNumber) => {
-            callback({
-              memberId,
-              block: blockNumber,
-            }, 200)
-          })
-          .catch((reason) => {
-            log('Failed to get extrinsic block number', reason)
-            callback({
-              memberId,
-              block: null,
-            }, 200)
-          })
-      } else {
-        let errMessage = 'UnknownError'
-        const record = failed as EventRecord
-        const {
-          event: { data },
-        } = record
-        const err = data[0] as DispatchError
-        if (err.isModule) {
-          const { name } = (api.registry as TypeRegistry).findMetaError(err.asModule)
-          errMessage = name
-        }
-        log('Failed to register:', errMessage)
-        callback({
-          error: errMessage,
-        }, 400)
-      }
-    })
-  } catch (err) {
-    log(err)
-    callback({
-      error: 'InternalServerError'
-    }, 500)
+  const handleRegisterError = (err: unknown) => {
+    error(err)
+    if (err instanceof ErrorWithData) {
+      callback(err.data, err.code)
+    } else {
+      callback(
+        {
+          error: 'InternalServerError',
+        },
+        500
+      )
+    }
   }
-}
 
+  const giftMembershipTx = joy.makeGiftMembershipTx({
+    account,
+    handle,
+    avatar,
+    name,
+    about,
+    externalResources,
+  })
+
+  // Check inviting key has balance to gift new member
+  const canInviteMember = await joy.invitingAccountHasFundsToGift(
+    giftMembershipTx
+  )
+
+  if (!canInviteMember) {
+    // log faucet exhausted
+    log('Faucet exhausted')
+
+    // send email alert faucet is exhausted
+    sendEmailAlert('Faucet is exhausted')
+
+    return callback({ error: 'FaucetExhausted' }, 500)
+  }
+
+  // Do throttling after all input validation checks to avoid DoS attack by someone repeatedly
+  // trying to register with most likely outcome being unsuccsessful.
+  if (ENABLE_API_THROTTLING && !canBypass) {
+    // apply limit per ip address
+    const wasBlockedIp = await ipLimiter.limit(`${ip}-register`)
+    if (wasBlockedIp) {
+      log(`${ip} was throttled`)
+      return callback({ error: 'TooManyRequestsPerIp' }, 429)
+    }
+
+    // apply global api call limit
+    const wasBlockedGlobal = await globalLimiter.limit(GLOBAL_REGISTER_ID)
+    if (wasBlockedGlobal) {
+      log('global throttled')
+      return callback({ error: 'TooManyRequests' }, 429)
+    }
+  }
+
+  let memberId: MemberId | undefined
+  let registeredAtBlock: RegisterBlockData
+
+  try {
+    const result = await joy.sendAndProcessTx(giftMembershipTx)
+    memberId = memberIdFromEvent(result.events)
+    log('Created New member id:', memberId?.toNumber(), 'handle:', handle)
+
+    // Try to include block information
+    const blockHash = result.status.asInBlock
+    try {
+      const blockNumber = await joy.blockHeightFromHash(blockHash)
+      registeredAtBlock = { block: blockNumber, blockHash }
+    } catch (reason) {
+      error('Failed to get extrinsic block number', reason)
+      registeredAtBlock = { block: null }
+    }
+  } catch (err) {
+    handleRegisterError(err)
+    sendEmailAlert(`Failed to register new member. ${err}`)
+    return
+  }
+
+  let result: RegisterResult = {
+    memberId: memberId?.toNumber(),
+    ...registeredAtBlock,
+  }
+  callback(result, 200)
+}
