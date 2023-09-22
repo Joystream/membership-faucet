@@ -112,6 +112,7 @@ export async function register(
   // verify captcha if enabled
   if (HCAPTCHA_ENABLED && !canBypass) {
     if (!captchaToken) {
+      log('No captcha sent with request')
       callback(
         {
           error: 'MissingCaptchaToken',

@@ -172,6 +172,7 @@ app.post('/register', async (req, res) => {
     } finally {
       processingRequest.unlock()
       stopTimer()
+      log('request handled')
     }
   })
 })
