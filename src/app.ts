@@ -96,7 +96,7 @@ app.get('/status', async (req, res) => {
 })
 
 app.post('/register', async (req, res) => {
-  log(`register request for ${req.body.handle} from ${req.ip}`)
+  log(`Register request for ${req.body.handle} from ${req.ip}`)
   metrics.register_attempt.inc(1)
 
   await joy.init

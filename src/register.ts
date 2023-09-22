@@ -100,11 +100,12 @@ export async function register(
         },
         403
       )
-      log(`Too many failed auth attempts from ${ip}`)
+      log('Too many failed auth attempts from', ip)
       return
     } else {
       authLimiter.clear(`${ip}-auth`)
       canBypass = true
+      log('Request authorized to bypass captcha', ip)
     }
   }
 
@@ -121,7 +122,6 @@ export async function register(
     } else {
       const captchaResult = await verifyCaptcha(captchaToken)
       if (captchaResult !== true) {
-        log('captcha verification failed:', captchaResult)
         callback(
           {
             error: 'InvalidCaptchaToken',
@@ -140,7 +140,7 @@ export async function register(
   try {
     decodeAddress(account)
   } catch (err) {
-    log('invalid address supplied')
+    log('Invalid address', account)
     callback(
       {
         error: 'InvalidAddress',
@@ -152,6 +152,7 @@ export async function register(
 
   // Ensure nonce = 0 and balance = 0 for account
   if (!(await joy.isFreshAccount(account))) {
+    log('Account is not fresh', account)
     callback(
       {
         error: 'OnlyNewAccountsCanBeUsedForScreenedMembers',
@@ -165,6 +166,7 @@ export async function register(
   const maxHandleLength = new BN(MAX_HANDLE_LENGTH)
 
   if (maxHandleLength.ltn(handle.length)) {
+    log('Handle too long', handle.length)
     callback(
       {
         error: 'HandleTooLong',
@@ -175,6 +177,7 @@ export async function register(
   }
 
   if (minHandleLength.gtn(handle.length)) {
+    log('Handle too short', handle.length)
     callback(
       {
         error: 'HandleTooShort',
@@ -186,7 +189,7 @@ export async function register(
 
   // Ensure handle is unique
   if (await joy.handleIsAlreadyRegistered(handle)) {
-    log('handle already registered')
+    log('Handle already registered')
     callback(
       {
         error: 'HandleAlreadyRegistered',
@@ -247,7 +250,7 @@ export async function register(
     // apply global api call limit
     const wasBlockedGlobal = await globalLimiter.limit(GLOBAL_REGISTER_ID)
     if (wasBlockedGlobal) {
-      log('global throttled')
+      log('Global throttled')
       return callback({ error: 'TooManyRequests' }, 429)
     }
   }

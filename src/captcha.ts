@@ -19,8 +19,10 @@ export async function verifyCaptcha(
     return true
   }
 
-  if(observedTokens.has(token)) {
-    log('Token reuse:', token)
+  log('Verifying Captcha token:', token)
+  if (observedTokens.has(token)) {
+    log('Captcha token already used')
+    return ['token-already-used']
   } else {
     observedTokens.add(token)
   }
@@ -39,9 +41,10 @@ export async function verifyCaptcha(
     })
     const data = (await response.json()) as CaptchaResponse
     if (data.success) {
-      log('Captcha verification success:', data.hostname, data.challenge_ts)
+      log('Captcha valid:', data.hostname, data.challenge_ts)
       return true
     } else {
+      log('Captcha invalid:', data['error-codes'])
       return data['error-codes']
     }
   } catch (e) {
