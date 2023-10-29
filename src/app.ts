@@ -96,7 +96,7 @@ app.get('/status', async (req, res) => {
 })
 
 app.post('/register', async (req, res) => {
-  log(`register request for ${req.body.handle} from ${req.ip}`)
+  log(`Register request from=${req.ip} handle=${req.body.handle} captchaToken=${req.body.captchaToken}`)
   metrics.register_attempt.inc(1)
 
   await joy.init
@@ -172,6 +172,7 @@ app.post('/register', async (req, res) => {
     } finally {
       processingRequest.unlock()
       stopTimer()
+      log('request handled')
     }
   })
 })
