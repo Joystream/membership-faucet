@@ -142,7 +142,7 @@ export class JoyApi {
     return this.api.tx.members.giftMembership({
       rootAccount: account,
       controllerAccount: account,
-      handle: createType('Bytes', Buffer.from(handle).toString('hex')),
+      handle: createType('Bytes', '0x' + Buffer.from(handle).toString('hex')),
       metadata: createType(
         'Bytes',
         '0x' +
