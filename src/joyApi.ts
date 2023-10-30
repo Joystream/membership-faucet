@@ -118,7 +118,7 @@ export class JoyApi {
   }
 
   async handleIsAlreadyRegistered(handle: string): Promise<boolean> {
-    const handleHash = blake2AsHex(handle)
+    const handleHash = blake2AsHex(createType('Bytes', Buffer.from(handle).toString('hex')))
     const storageSize = await this.api.query.members.memberIdByHandleHash.size(
       handleHash
     )
@@ -142,7 +142,7 @@ export class JoyApi {
     return this.api.tx.members.giftMembership({
       rootAccount: account,
       controllerAccount: account,
-      handle: handle,
+      handle: createType('Bytes', Buffer.from(handle).toString('hex')),
       metadata: createType(
         'Bytes',
         '0x' +
