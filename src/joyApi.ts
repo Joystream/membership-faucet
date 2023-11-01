@@ -118,7 +118,7 @@ export class JoyApi {
   }
 
   async handleIsAlreadyRegistered(handle: string): Promise<boolean> {
-    const handleHash = blake2AsHex(Buffer.from(handle).toString('hex'))
+    const handleHash = blake2AsHex(Buffer.from(handle))
     const storageSize = await this.api.query.members.memberIdByHandleHash.size(
       handleHash
     )
